@@ -1,0 +1,25 @@
+# Java
+target/
+*.class
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# Vue / Node
+node_modules/
+dist/
+.DS_Store
+*.log
+.env.local
+.env.*.local
+
+# 日志
+*.log
