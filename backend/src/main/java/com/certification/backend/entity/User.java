@@ -12,13 +12,13 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false, length = 50)
+    @Column(unique = true, nullable = false, length = 12) //工号/学号/管理员账号
     private String username;
 
-    @Column(nullable = false, length = 255)
+    @Column(nullable = false, length = 20)
     private String password;
 
-    @Column(length = 50)
+    @Column(length = 10)
     private String name;
 
     @Column(length = 20)
@@ -27,10 +27,10 @@ public class User {
     @Column(length = 20)
     private String phone;
 
-    @Column(length = 100)
+    @Column(length = 50)
     private String email;
 
-    @Column(length = 100)
+    @Column(length = 50)
     private String department;
 
     @Column(name = "created_at")
