@@ -15,7 +15,7 @@ public class User {
     @Column(unique = true, nullable = false, length = 12) //工号/学号/管理员账号
     private String username;
 
-    @Column(nullable = false, length = 20)
+    @Column(nullable = false, length = 60)
     private String password;
 
     @Column(length = 10)
@@ -33,12 +33,26 @@ public class User {
     @Column(length = 50)
     private String department;
 
+    /**
+     * 状态：1 正常，0 停用
+     */
+    @Column(nullable = false)
+    private Integer status = 1;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    // JPA自动填充创建时间
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }

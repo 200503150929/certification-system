@@ -49,6 +49,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 放行登录接口
                         .requestMatchers("/auth/login").permitAll()
+                        // 放行 Swagger UI 相关路径
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         // 其他所有请求都需要认证
                         .anyRequest().authenticated()
                 )
