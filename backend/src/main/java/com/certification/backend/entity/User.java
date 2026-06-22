@@ -31,7 +31,7 @@ public class User {
     private String email;
 
     @Column(length = 50)
-    private String department;
+    private String department;//院系
 
     /**
      * 状态：1 正常，0 停用

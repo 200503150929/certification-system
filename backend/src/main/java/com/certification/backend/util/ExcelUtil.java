@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Excel 导入工具类（基于 EasyExcel），读取 Excel 批量转换为 User 实体
@@ -26,8 +27,6 @@ public class ExcelUtil {
 
     /**
      * 简单读取 Excel 并转换为 User 列表
-     * <p>
-     * 使用 EasyExcel 的同步读取模式。
      *
      * @param file 上传的 Excel 文件
      * @return 解析后的 User 列表（未持久化）
@@ -38,7 +37,19 @@ public class ExcelUtil {
         try (InputStream in = file.getInputStream()) {
             List<List<String>> rows = readAllRows(in);
 
-            for (int i = 1; i < rows.size(); i++) { // 跳过表头（第0行）
+            // rows 现在包含所有数据行，没有表头（因为 headRowNumber(0)）
+            // 如果使用 headRowNumber(0)，则 rows 包含所有行，包括表头
+            // 所以第一行就是数据，但你的 Excel 有表头，所以应该从第1行开始
+            int startRow = 0;
+            // 检查第一行是否是表头（包含"用户名"字样）
+            if (!rows.isEmpty() && rows.get(0).size() > 0) {
+                String firstCell = rows.get(0).get(0);
+                if ("用户名".equals(firstCell) || firstCell.contains("用户")) {
+                    startRow = 1; // 跳过表头
+                }
+            }
+
+            for (int i = startRow; i < rows.size(); i++) {
                 List<String> row = rows.get(i);
                 if (row == null || row.isEmpty()) {
                     continue;
@@ -92,13 +103,32 @@ public class ExcelUtil {
     }
 
     /**
-     * 基于 EasyExcel 同步读取所有行（不依赖监听器）
+     * 基于 EasyExcel 同步读取所有行
+     * headRowNumber(0) 表示不自动映射表头，返回所有行
      */
     private static List<List<String>> readAllRows(InputStream in) {
-        // 使用 com.alibaba.excel.EasyExcel 的同步读取
-        return com.alibaba.excel.EasyExcel.read(in)
-                .headRowNumber(0)
+        // 读取所有行，包括表头
+        List<Map<Integer, String>> rows = com.alibaba.excel.EasyExcel.read(in)
+                .headRowNumber(0)  // 0 表示没有表头，所有行都是数据
                 .sheet()
                 .doReadSync();
+
+        // 将 Map<Integer, String> 转换为 List<String>
+        List<List<String>> result = new ArrayList<>();
+        for (Map<Integer, String> rowMap : rows) {
+            List<String> rowList = new ArrayList<>();
+            // 按列索引顺序取出值
+            int maxIndex = 0;
+            for (Integer key : rowMap.keySet()) {
+                if (key > maxIndex) {
+                    maxIndex = key;
+                }
+            }
+            for (int i = 0; i <= maxIndex; i++) {
+                rowList.add(rowMap.get(i));
+            }
+            result.add(rowList);
+        }
+        return result;
     }
 }

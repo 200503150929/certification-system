@@ -6,11 +6,15 @@ import com.certification.backend.dto.response.PageResult;
 import com.certification.backend.dto.response.ResponseVO;
 import com.certification.backend.dto.response.UserResponse;
 import com.certification.backend.entity.User;
+import com.certification.backend.enums.ResultCodeEnum;
 import com.certification.backend.service.UserService;
 import com.certification.backend.util.ExcelUtil;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -81,12 +85,21 @@ public class UserController {
         return ResponseVO.success();
     }
 
-    @Operation(summary = "批量导入用户（Excel）",
-            description = "上传 Excel 文件批量导入用户，文件需包含：用户名、姓名、角色、电话、邮箱、院系")
-    @PostMapping("/import")
-    public ResponseVO<String> importUsers(@RequestParam("file") MultipartFile file) {
+    @Operation(
+            summary = "批量导入用户（Excel）",
+            description = "上传 Excel 文件批量导入用户，文件需包含：用户名、姓名、角色、电话、邮箱、院系"
+    )
+    @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseVO<String> importUsers(
+            @Parameter(
+                    description = "Excel 文件（.xlsx 格式）",
+                    required = true,
+                    content = @Content(mediaType = MediaType.MULTIPART_FORM_DATA_VALUE)
+            )
+            @RequestParam("file") MultipartFile file
+    ) {
         if (file.isEmpty()) {
-            return ResponseVO.error(400, "上传文件不能为空");
+            return ResponseVO.error(ResultCodeEnum.BAD_REQUEST.getCode(), "上传文件不能为空");
         }
         List<User> users = ExcelUtil.readUsersFromExcel(file);
         int count = userService.batchImport(users);
