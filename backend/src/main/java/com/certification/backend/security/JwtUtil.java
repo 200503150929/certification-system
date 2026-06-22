@@ -27,7 +27,7 @@ public class JwtUtil {
 
     private final long expiration;
 
-    public JwtUtil(@Value("${jwt.secret:certification-system-secret-key-2024-eeas-jwt-hs256}") String secret,
+    public JwtUtil(@Value("${jwt.secret:certification-system-secret-key-2026-eeas-jwt-hs256}") String secret,
                    @Value("${jwt.expiration:86400000}") long expiration) {
         this.secretKey = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expiration = expiration;
