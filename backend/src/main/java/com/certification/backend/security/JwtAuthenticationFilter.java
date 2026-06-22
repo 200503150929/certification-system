@@ -1,0 +1,88 @@
+package com.certification.backend.security;
+
+import com.certification.backend.repository.UserRepository;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+/**
+ * JWT Token 校验过滤器，拦截请求并设置 SecurityContextHolder
+ */
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
+
+    private static final String AUTHORIZATION_HEADER = "Authorization";
+    private static final String BEARER_PREFIX = "Bearer ";
+
+    private final JwtUtil jwtUtil;
+    private final UserDetailsServiceImpl userDetailsService;
+    private final UserRepository userRepository;
+
+    public JwtAuthenticationFilter(JwtUtil jwtUtil,
+                                   UserDetailsServiceImpl userDetailsService,
+                                   UserRepository userRepository) {
+        this.jwtUtil = jwtUtil;
+        this.userDetailsService = userDetailsService;
+        this.userRepository = userRepository;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        String token = extractToken(request);
+
+        if (StringUtils.hasText(token)) {
+            String username = jwtUtil.getUsername(token);
+
+            if (StringUtils.hasText(username) && SecurityContextHolder.getContext().getAuthentication() == null) {
+                // 验证用户是否仍有效（未删除、未禁用）
+                boolean userActive = userRepository.findByUsername(username)
+                        .map(user -> user.getStatus() == 1)
+                        .orElse(false);
+
+                if (userActive && jwtUtil.validateToken(token)) {
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                    log.debug("JWT 认证成功: {}", username);
+                } else {
+                    log.warn("JWT 用户无效或 Token 已过期: {}", username);
+                }
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    /**
+     * 从请求头中提取 Bearer Token
+     */
+    private String extractToken(HttpServletRequest request) {
+        String header = request.getHeader(AUTHORIZATION_HEADER);
+        if (StringUtils.hasText(header) && header.startsWith(BEARER_PREFIX)) {
+            return header.substring(BEARER_PREFIX.length());
+        }
+        return null;
+    }
+}
