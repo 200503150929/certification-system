@@ -1,10 +1,14 @@
 package com.certification.backend.dto.response;
 
 import com.certification.backend.enums.ResultCodeEnum;
+import lombok.Getter;
+import lombok.Setter;
 
 /**
  * 统一响应体
  */
+@Setter
+@Getter
 public class ResponseVO<T> {
 
     private String status;
@@ -60,35 +64,4 @@ public class ResponseVO<T> {
 
     // ---------- Getters & Setters ----------
 
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public int getCode() {
-        return code;
-    }
-
-    public void setCode(int code) {
-        this.code = code;
-    }
-
-    public String getInfo() {
-        return info;
-    }
-
-    public void setInfo(String info) {
-        this.info = info;
-    }
-
-    public T getData() {
-        return data;
-    }
-
-    public void setData(T data) {
-        this.data = data;
-    }
 }
