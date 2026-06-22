@@ -1,8 +1,13 @@
 package com.certification.backend.dto.response;
 
+import lombok.Getter;
+import lombok.Setter;
+
 /**
  * 登录成功响应
  */
+@Setter
+@Getter
 public class LoginResponse {
 
     private String token;
@@ -22,43 +27,4 @@ public class LoginResponse {
         this.role = role;
     }
 
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
-
-    public Long getUserId() {
-        return userId;
-    }
-
-    public void setUserId(Long userId) {
-        this.userId = userId;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public String getRole() {
-        return role;
-    }
-
-    public void setRole(String role) {
-        this.role = role;
-    }
 }
