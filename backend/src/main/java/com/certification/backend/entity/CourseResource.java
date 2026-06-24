@@ -21,6 +21,9 @@ public class CourseResource {
     @Column(name = "file_path", length = 500)
     private String filePath;
 
+    @Column(name = "resource_type", length = 50)
+    private String resourceType;
+
     @Column(name = "upload_time")
     private LocalDateTime uploadTime;
 
