@@ -1,5 +1,6 @@
 package com.certification.backend.dto.request;
 
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
@@ -23,6 +24,7 @@ public class CourseRequest {
     private String name;
 
     @NotNull(message = "学分不能为空")
+    @DecimalMin(value = "0.1", message = "学分必须大于0")
     private BigDecimal credits;
 
     private Integer totalHours;
