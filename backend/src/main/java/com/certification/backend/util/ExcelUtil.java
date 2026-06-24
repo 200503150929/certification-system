@@ -1,22 +1,27 @@
 package com.certification.backend.util;
 
 import com.certification.backend.entity.User;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Excel 导入工具类（基于 EasyExcel），读取 Excel 批量转换为 User 实体
+ * Excel 导入工具类（基于 EasyExcel）
  *
- * 预期 Excel 列顺序：
- * 用户名（必填）、姓名（必填）、角色（必填，admin/teacher/student）、
- * 电话、邮箱、院系/部门
+ * 支持两类 Excel 解析：
+ * 1. 用户批量导入：用户名、姓名、角色、电话、邮箱、院系
+ * 2. 成绩批量导入：学号、分数
  */
 public class ExcelUtil {
 
@@ -90,6 +95,91 @@ public class ExcelUtil {
 
         return userList;
     }
+
+    // ==================== 成绩导入 ====================
+
+    /**
+     * 成绩导入行数据结构
+     */
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class GradeImportRow {
+        /** 学号（对应 User 表的 username 字段） */
+        private String studentNo;
+        /** 分数 */
+        private BigDecimal score;
+    }
+
+    /**
+     * 读取 Excel 成绩文件，返回 GradeImportRow 列表
+     *
+     * Excel 格式要求：
+     * 第 1 行：表头（自动忽略）
+     * 第 1 列：学号（studentNo，必填）
+     * 第 2 列：分数（score，必填，0-100 的数字）
+     *
+     * @param file 上传的 Excel 文件
+     * @return 解析后的 GradeImportRow 列表（未持久化）
+     */
+    public static List<GradeImportRow> readGradesFromExcel(MultipartFile file) {
+        List<GradeImportRow> result = new ArrayList<>();
+
+        try (InputStream in = file.getInputStream()) {
+            List<List<String>> rows = readAllRows(in);
+
+            // 跳过第一行表头（从索引 1 开始）
+            for (int i = 1; i < rows.size(); i++) {
+                List<String> row = rows.get(i);
+                if (row == null || row.isEmpty()) {
+                    continue;
+                }
+
+                try {
+                    // 第 1 列：学号
+                    String studentNo = getCell(row, 0);
+                    if (studentNo == null || studentNo.isEmpty()) {
+                        log.warn("Excel 第{}行跳过：学号为空", i + 1);
+                        continue;
+                    }
+
+                    // 第 2 列：分数
+                    String scoreStr = getCell(row, 1);
+                    if (scoreStr == null || scoreStr.isEmpty()) {
+                        log.warn("Excel 第{}行跳过：分数为空（学号={}）", i + 1, studentNo);
+                        continue;
+                    }
+
+                    BigDecimal score;
+                    try {
+                        score = new BigDecimal(scoreStr);
+                    } catch (NumberFormatException e) {
+                        log.warn("Excel 第{}行跳过：分数格式错误 '{}'（学号={}）", i + 1, scoreStr, studentNo);
+                        continue;
+                    }
+
+                    if (score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(new BigDecimal("100")) > 0) {
+                        log.warn("Excel 第{}行跳过：分数超出0-100范围 {}（学号={}）", i + 1, scoreStr, studentNo);
+                        continue;
+                    }
+
+                    result.add(new GradeImportRow(studentNo, score));
+
+                } catch (Exception e) {
+                    log.warn("Excel 第{}行解析失败: {}", i + 1, e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            log.error("读取 Excel 文件失败", e);
+            throw new RuntimeException("Excel 文件读取失败: " + e.getMessage(), e);
+        }
+
+        log.info("Excel 成绩导入解析完成，共解析 {} 条有效记录", result.size());
+        return result;
+    }
+
+    // ==================== 私有方法 ====================
 
     /**
      * 安全获取单元格字符串值

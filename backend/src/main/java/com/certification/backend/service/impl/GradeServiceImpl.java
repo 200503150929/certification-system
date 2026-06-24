@@ -13,6 +13,9 @@ import com.certification.backend.repository.CourseOfferingRepository;
 import com.certification.backend.repository.GradeRepository;
 import com.certification.backend.repository.UserRepository;
 import com.certification.backend.service.GradeService;
+import com.certification.backend.util.ExcelUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +32,8 @@ import java.util.stream.Collectors;
 @Service
 @Transactional
 public class GradeServiceImpl implements GradeService {
+
+    private static final Logger log = LoggerFactory.getLogger(GradeServiceImpl.class);
 
     private final GradeRepository gradeRepository;
     private final AssessmentRepository assessmentRepository;
@@ -161,5 +166,40 @@ public class GradeServiceImpl implements GradeService {
                 .ifPresent(u -> resp.setStudentName(u.getName()));
 
         return resp;
+    }
+
+    // ==================== 成绩批量导入 ====================
+
+    @Override
+    @Transactional
+    public int importGrades(Long assessmentId, List<ExcelUtil.GradeImportRow> gradeRows, String teacherUsername) {
+        // 校验考核环节存在，并校验教师权限
+        Assessment assessment = assessmentRepository.findById(assessmentId)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "考核环节不存在"));
+        getOfferingAndValidateOwner(assessment.getOfferingId(), teacherUsername);
+
+        int successCount = 0;
+        for (ExcelUtil.GradeImportRow row : gradeRows) {
+            // 根据学号查找学生
+            var studentOpt = userRepository.findByUsername(row.getStudentNo());
+            if (studentOpt.isEmpty()) {
+                log.warn("成绩导入跳过：学号 '{}' 在系统中找不到对应学生", row.getStudentNo());
+                continue;
+            }
+
+            User student = studentOpt.get();
+
+            // 构建 Grade 实体
+            Grade grade = new Grade();
+            grade.setAssessmentId(assessmentId);
+            grade.setStudentId(student.getId());
+            grade.setScore(row.getScore());
+
+            gradeRepository.save(grade);
+            successCount++;
+        }
+
+        log.info("成绩导入完成：考核环节ID={}，成功导入 {} / {} 条", assessmentId, successCount, gradeRows.size());
+        return successCount;
     }
 }
