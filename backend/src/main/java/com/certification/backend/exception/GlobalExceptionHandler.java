@@ -11,6 +11,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -50,6 +52,26 @@ public class GlobalExceptionHandler {
     @ResponseStatus(HttpStatus.FORBIDDEN)
     public ResponseVO<Void> handleAccessDeniedException(AccessDeniedException e) {
         return ResponseVO.error(ResultCodeEnum.FORBIDDEN);
+    }
+
+    /**
+     * 资源不存在（404）- URL 路径不匹配任何 Controller 映射
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ResponseVO<Void> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.warn("请求路径不存在: {}", e.getResourcePath());
+        return ResponseVO.error(ResultCodeEnum.NOT_FOUND.getCode(), "请求路径不存在: " + e.getResourcePath());
+    }
+
+    /**
+     * 资源不存在（404）- 无 Handler 处理
+     */
+    @ExceptionHandler(NoHandlerFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ResponseVO<Void> handleNoHandlerFoundException(NoHandlerFoundException e) {
+        log.warn("请求路径不存在: {} {}", e.getHttpMethod(), e.getRequestURL());
+        return ResponseVO.error(ResultCodeEnum.NOT_FOUND.getCode(), "请求路径不存在");
     }
 
     /**

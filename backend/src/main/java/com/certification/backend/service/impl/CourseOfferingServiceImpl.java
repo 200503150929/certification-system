@@ -11,6 +11,7 @@ import com.certification.backend.enums.ResultCodeEnum;
 import com.certification.backend.exception.BusinessException;
 import com.certification.backend.repository.CourseOfferingRepository;
 import com.certification.backend.repository.CourseRepository;
+import com.certification.backend.repository.StudentCourseRepository;
 import com.certification.backend.repository.UserRepository;
 import com.certification.backend.service.CourseOfferingService;
 import jakarta.persistence.criteria.Predicate;
@@ -37,15 +38,18 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
     private final CourseOfferingRepository offeringRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
+    private final StudentCourseRepository studentCourseRepository;
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public CourseOfferingServiceImpl(CourseOfferingRepository offeringRepository,
                                      CourseRepository courseRepository,
-                                     UserRepository userRepository) {
+                                     UserRepository userRepository,
+                                     StudentCourseRepository studentCourseRepository) {
         this.offeringRepository = offeringRepository;
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
+        this.studentCourseRepository = studentCourseRepository;
     }
 
     @Override
@@ -179,6 +183,11 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
 
         if (!offering.getTeacherId().equals(teacher.getId())) {
             throw new BusinessException(ResultCodeEnum.FORBIDDEN, "无权删除该开课记录");
+        }
+
+        // 检查是否存在关联的学生选课记录，若有则阻止删除
+        if (studentCourseRepository.existsByOfferingId(id)) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST, "该开课记录已有关联的学生选课记录，无法删除");
         }
 
         offeringRepository.deleteById(id);
