@@ -12,6 +12,10 @@ import java.util.List;
  */
 @Repository
 public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecificationExecutor<Course> {
+    // 根据学生ID查询所有选课记录
+    List<Course> findByStudentId(Long studentId);
+    // 根据开课ID查询所有选课学生
+    List<Course> findByOfferingId(Long offeringId);
 
     /**
      * 根据培养方案ID查询课程列表

@@ -9,7 +9,8 @@ import java.util.Optional;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
-
+    // 根据用户主键id查询单个用户
+    Optional<User> findById(Long id);
     /**
      * 根据用户名查询用户
      */
