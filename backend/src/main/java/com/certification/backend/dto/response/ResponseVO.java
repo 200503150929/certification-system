@@ -35,6 +35,13 @@ public class ResponseVO<T> {
     }
 
     /**
+     * 成功响应（带自定义消息和数据）
+     */
+    public static <T> ResponseVO<T> success(String message, T data) {
+        return new ResponseVO<>("success", ResultCodeEnum.SUCCESS.getCode(), message, data);
+    }
+
+    /**
      * 成功响应（无数据）
      */
     public static <T> ResponseVO<T> success() {

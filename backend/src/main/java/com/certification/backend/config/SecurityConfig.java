@@ -51,7 +51,9 @@ public class SecurityConfig {
                         .requestMatchers("/auth/login").permitAll()
                         // 放行测试接口
                         .requestMatchers("/test/**").permitAll()
-                        // 放行 Swagger UI 相关路径
+                        // 放行上传文件静态资源访问
+                        .requestMatchers("/uploads/**").permitAll()
+                        // 放行 Swagger UI 的相关路径
                         .requestMatchers(
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
