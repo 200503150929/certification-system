@@ -27,4 +27,9 @@ public interface CourseRepository extends JpaRepository<Course, Long>, JpaSpecif
      * 检查课程代码是否已存在（排除指定ID）
      */
     boolean existsByCodeAndIdNot(String code, Long id);
+
+    /**
+     * 根据课程代码查询课程
+     */
+    java.util.Optional<Course> findByCode(String code);
 }
