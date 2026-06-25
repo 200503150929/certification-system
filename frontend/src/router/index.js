@@ -1,8 +1,303 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Login from '../views/Login.vue'
+import Layout from '../views/layout/Layout.vue'
+import Dashboard from '../views/Dashboard.vue'
+import UserManagement from '../views/UserManagement.vue'
+import RoleManagement from '../views/RoleManagement.vue'
+import CourseManagement from '../views/CourseManagement.vue'
+
+// ============ 模块七：个人信息与课程查看 ============
+import Profile from '../views/Profile.vue'
+import MyCourses from '../views/MyCourses.vue'
+import CourseDetail from '../views/CourseDetail.vue'
+import CourseStudents from '../views/CourseStudents.vue'
+import TeacherCourseManage from '../views/TeacherCourseManage.vue'
+
+// ============ 模块二：人才培养方案管理 ============
+import CurriculumManagement from '../views/curriculum/CurriculumManagement.vue'
+import CurriculumGoals from '../views/curriculum/CurriculumGoals.vue'
+import CurriculumRequirements from '../views/curriculum/CurriculumRequirements.vue'
+import CurriculumIndicators from '../views/curriculum/CurriculumIndicators.vue'
+import CurriculumMatrix from '../views/curriculum/CurriculumMatrix.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [],
+  routes: [
+    // ============ 登录页（无需登录） ============
+    {
+      path: '/login',
+      name: 'Login',
+      component: Login,
+      meta: {
+        title: '登录',
+        requiresAuth: false
+      }
+    },
+
+    // ============ 主布局（需要登录） ============
+    {
+      path: '/',
+      component: Layout,
+      redirect: () => (getUserRole() === '学生' ? '/my-courses' : '/dashboard'),
+      meta: { requiresAuth: true },
+      children: [
+        // ----- 仪表盘（管理员/教师） -----
+        {
+          path: 'dashboard',
+          name: 'Dashboard',
+          component: Dashboard,
+          meta: {
+            title: '数据看板',
+            icon: 'Monitor',
+            roles: ['管理员', '教师']
+          }
+        },
+
+        // ----- 个人信息（学生/教师） -----
+        {
+          path: 'profile',
+          name: 'Profile',
+          component: Profile,
+          meta: {
+            title: '个人信息',
+            icon: 'User',
+            roles: ['教师', '学生']
+          }
+        },
+
+        // ----- 我的课程（学生/教师共用） -----
+        {
+          path: 'my-courses',
+          name: 'MyCourses',
+          component: MyCourses,
+          meta: {
+            title: '我的课程',
+            icon: 'Document',
+            roles: ['教师', '学生']
+          }
+        },
+
+        // ----- 课程管理（管理员按专业管理） -----
+        {
+          path: 'courses/program/:programId',
+          name: 'CourseManagement',
+          component: CourseManagement,
+          meta: {
+            title: '课程管理',
+            icon: 'Document',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 课程详情（学生端） -----
+        {
+          path: 'course/:id',
+          name: 'CourseDetail',
+          component: CourseDetail,
+          meta: {
+            title: '课程详情',
+            roles: ['学生']
+          }
+        },
+
+        // ----- 课程管理详情（教师端） -----
+        {
+          path: 'teacher/course/:id',
+          name: 'TeacherCourseManage',
+          component: TeacherCourseManage,
+          meta: {
+            title: '课程管理',
+            roles: ['教师']
+          }
+        },
+
+        // ----- 课程学生名单（教师端） -----
+        {
+          path: 'course/:id/students',
+          name: 'CourseStudents',
+          component: CourseStudents,
+          meta: {
+            title: '学生名单',
+            icon: 'UserFilled',
+            roles: ['教师']
+          }
+        },
+
+        // ----- 用户管理（仅管理员） -----
+        {
+          path: 'users',
+          name: 'UserManagement',
+          component: UserManagement,
+          meta: {
+            title: '用户管理',
+            icon: 'UserFilled',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 角色权限（仅管理员） -----
+        {
+          path: 'roles',
+          name: 'RoleManagement',
+          component: RoleManagement,
+          meta: {
+            title: '角色权限',
+            icon: 'Connection',
+            roles: ['管理员']
+          }
+        },
+
+        // ============ 模块二：人才培养方案管理（仅管理员） ============
+        // ----- 专业管理 -----
+        {
+          path: '/curriculum/management',
+          name: 'CurriculumManagement',
+          component: CurriculumManagement,
+          meta: {
+            title: '专业管理',
+            icon: 'DocumentCopy',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 培养目标管理 -----
+        {
+          path: '/curriculum/goals',
+          name: 'CurriculumGoals',
+          component: CurriculumGoals,
+          meta: {
+            title: '培养目标管理',
+            icon: 'DocumentAdd',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 毕业要求管理 -----
+        {
+          path: '/curriculum/requirements',
+          name: 'CurriculumRequirements',
+          component: CurriculumRequirements,
+          meta: {
+            title: '毕业要求管理',
+            icon: 'DocumentChecked',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 指标点管理 -----
+        {
+          path: '/curriculum/indicators',
+          name: 'CurriculumIndicators',
+          component: CurriculumIndicators,
+          meta: {
+            title: '指标点管理',
+            icon: 'List',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 支撑矩阵 -----
+        {
+          path: '/curriculum/matrix',
+          name: 'CurriculumMatrix',
+          component: CurriculumMatrix,
+          meta: {
+            title: '支撑矩阵',
+            icon: 'Grid',
+            roles: ['管理员']
+          }
+        },
+
+        // ----- 系统设置（仅管理员，暂时注释） -----
+        // {
+        //   path: 'settings/system',
+        //   name: 'SystemSettings',
+        //   component: () => import('../views/SystemSettings.vue'),
+        //   meta: {
+        //     title: '系统参数',
+        //     icon: 'Setting',
+        //     roles: ['管理员']
+        //   }
+        // },
+        // {
+        //   path: 'settings/logging',
+        //   name: 'Logging',
+        //   component: () => import('../views/Logging.vue'),
+        //   meta: {
+        //     title: '日志审计',
+        //     icon: 'Document',
+        //     roles: ['管理员']
+        //   }
+        // }
+      ]
+    },
+
+    // ============ 404 页面（暂时注释） ============
+    // {
+    //   path: '/:pathMatch(.*)*',
+    //   name: 'NotFound',
+    //   component: () => import('../views/NotFound.vue'),
+    //   meta: { title: '404' }
+    // }
+  ]
+})
+
+// ============ 路由守卫 ============
+// 获取用户角色（从 localStorage 获取）
+const getUserRole = () => {
+  return localStorage.getItem('userRole') || '学生'
+}
+
+const getHomePath = (userRole) => {
+  return userRole === '学生' ? '/my-courses' : '/dashboard'
+}
+
+// 检查是否有权限访问
+const hasPermission = (routeRoles, userRole) => {
+  if (!routeRoles || routeRoles.length === 0) return true
+  return routeRoles.includes(userRole)
+}
+
+router.beforeEach((to, from, next) => {
+  // 获取 token
+  const token = localStorage.getItem('token')
+  const userRole = getUserRole()
+
+  // 1. 如果访问的是登录页
+  if (to.path === '/login') {
+    if (token) {
+      // 已登录，跳转到首页
+      next(getHomePath(userRole))
+    } else {
+      next()
+    }
+    return
+  }
+
+  // 2. 检查是否需要登录
+  if (to.meta.requiresAuth !== false) {
+    if (!token) {
+      // 未登录，跳转到登录页
+      next({
+        path: '/login',
+        query: { redirect: to.fullPath }
+      })
+      return
+    }
+
+    // 3. 检查角色权限
+    const routeRoles = to.meta.roles
+    if (routeRoles && !hasPermission(routeRoles, userRole)) {
+      // 无权限，跳转到首页
+      next(getHomePath(userRole))
+      // 使用 ElMessage 提示（需要引入）
+      // 如果未引入 ElMessage，可以用 console.warn
+      console.warn('您没有权限访问该页面')
+      return
+    }
+  }
+
+  next()
 })
 
 export default router
