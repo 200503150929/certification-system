@@ -31,4 +31,9 @@ public interface ObjectiveIndicatorMatrixRepository extends JpaRepository<Object
      * 根据课程目标ID删除支撑关系
      */
     void deleteByObjectiveId(Long objectiveId);
+
+    /**
+     * 根据课程目标ID列表批量删除支撑关系
+     */
+    void deleteByObjectiveIdIn(List<Long> objectiveIds);
 }

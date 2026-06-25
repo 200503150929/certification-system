@@ -1,7 +1,11 @@
 package com.certification.backend.config;
 
+import com.certification.backend.entity.Course;
+import com.certification.backend.entity.Program;
 import com.certification.backend.entity.Role;
 import com.certification.backend.entity.User;
+import com.certification.backend.repository.CourseRepository;
+import com.certification.backend.repository.ProgramRepository;
 import com.certification.backend.repository.RoleRepository;
 import com.certification.backend.repository.UserRepository;
 import org.slf4j.Logger;
@@ -21,13 +25,19 @@ public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final ProgramRepository programRepository;
+    private final CourseRepository courseRepository;
 
     public DataInitializer(RoleRepository roleRepository,
                            UserRepository userRepository,
-                           PasswordEncoder passwordEncoder) {
+                           PasswordEncoder passwordEncoder,
+                           ProgramRepository programRepository,
+                           CourseRepository courseRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.programRepository = programRepository;
+        this.courseRepository = courseRepository;
     }
 
     @Override
@@ -37,6 +47,12 @@ public class DataInitializer implements CommandLineRunner {
 
         // 2. 初始化默认管理员账号
         initDefaultAdmin();
+
+        // 3. 初始化测试教师账号（仅用于开发阶段测试）
+        initTestTeacher();
+
+        // 4. 初始化测试培养方案和课程（仅用于开发阶段测试）
+        initTestData();
     }
 
     private void initRoles() {
@@ -61,6 +77,50 @@ public class DataInitializer implements CommandLineRunner {
             admin.setStatus(1);
             userRepository.save(admin);
             log.info("初始化默认管理员账号: admin / 123456");
+        }
+    }
+
+    private void initTestTeacher() {
+        if (userRepository.findByUsername("teacher01").isEmpty()) {
+            User teacher = new User();
+            teacher.setUsername("teacher01");
+            teacher.setPassword(passwordEncoder.encode("123456"));
+            teacher.setName("测试教师");
+            teacher.setRole("teacher");
+            teacher.setPhone("13800000001");
+            teacher.setDepartment("计算机学院");
+            teacher.setStatus(1);
+            userRepository.save(teacher);
+            log.info("初始化测试教师账号: teacher01 / 123456");
+        }
+    }
+
+    private void initTestData() {
+        // 初始化测试培养方案
+        if (programRepository.count() == 0) {
+            Program program = new Program();
+            program.setMajorName("计算机科学与技术");
+            program.setVersion("2024");
+            program.setStatus("published");
+            program = programRepository.save(program);
+            log.info("初始化测试培养方案: 计算机科学与技术 2024");
+
+            // 初始化测试课程
+            if (courseRepository.count() == 0) {
+                Course course = new Course();
+                course.setCode("CS101");
+                course.setName("数据结构");
+                course.setCredits(new java.math.BigDecimal("4.0"));
+                course.setTotalHours(64);
+                course.setTheoryHours(48);
+                course.setLabHours(16);
+                course.setSemester("2025-1");
+                course.setCourseType("专业核心");
+                course.setIsRequired(true);
+                course.setProgramId(program.getId());
+                courseRepository.save(course);
+                log.info("初始化测试课程: CS101 数据结构 (id={})", course.getId());
+            }
         }
     }
 }

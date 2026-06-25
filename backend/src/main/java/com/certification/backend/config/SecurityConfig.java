@@ -49,6 +49,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // 放行登录接口
                         .requestMatchers("/auth/login").permitAll()
+                        // 放行测试接口
+                        .requestMatchers("/test/**").permitAll()
                         // 放行 Swagger UI 相关路径
                         .requestMatchers(
                                 "/v3/api-docs/**",
