@@ -169,6 +169,8 @@ public class DataInitializer implements CommandLineRunner {
             teacher.setPhone("13800000001");
             teacher.setEmail("zhang@university.edu");
             teacher.setDepartment("计算机学院");
+            teacher.setTitle("副教授");
+            teacher.setOffice("计算机楼 A305");
             teacher.setStatus(1);
             User saved = userRepository.save(teacher);
             log.info("  ✓ 教师: teacher01 / 123456 (张教授)");
@@ -181,9 +183,9 @@ public class DataInitializer implements CommandLineRunner {
     private List<User> initStudents() {
         List<User> students = new ArrayList<>();
         String[][] data = {
-                {"student01", "张三"},
-                {"student02", "李四"},
-                {"student03", "王五"}
+                {"student01", "张三", "计算机科学与技术", "2024级", "1班"},
+                {"student02", "李四", "计算机科学与技术", "2024级", "2班"},
+                {"student03", "王五", "计算机科学与技术", "2023级", "1班"}
         };
         for (String[] d : data) {
             User s = userRepository.findByUsername(d[0]).orElseGet(() -> {
@@ -193,6 +195,9 @@ public class DataInitializer implements CommandLineRunner {
                 student.setName(d[1]);
                 student.setRole("student");
                 student.setDepartment("计算机学院");
+                student.setMajor(d[2]);
+                student.setGrade(d[3]);
+                student.setClassName(d[4]);
                 student.setStatus(1);
                 return userRepository.save(student);
             });

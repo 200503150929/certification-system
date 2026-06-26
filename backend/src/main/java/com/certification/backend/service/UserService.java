@@ -3,6 +3,7 @@ package com.certification.backend.service;
 import com.certification.backend.dto.request.UserRequest;
 import com.certification.backend.dto.request.PageQuery;
 import com.certification.backend.dto.response.PageResult;
+import com.certification.backend.dto.response.UserProfileResponse;
 import com.certification.backend.dto.response.UserResponse;
 import com.certification.backend.entity.User;
 
@@ -48,4 +49,13 @@ public interface UserService {
      * 根据 ID 查询用户
      */
     UserResponse getUserById(Long id);
+
+    /**
+     * 根据用户名获取用户个人信息（教师/学生端查看个人资料）
+     *
+     * @param username 用户名（工号/学号）
+     * @return 用户个人信息
+     */
+    UserProfileResponse getProfile(String username);
+
 }

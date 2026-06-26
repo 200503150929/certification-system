@@ -3,6 +3,7 @@ package com.certification.backend.service.impl;
 import com.certification.backend.dto.request.UserRequest;
 import com.certification.backend.dto.request.PageQuery;
 import com.certification.backend.dto.response.PageResult;
+import com.certification.backend.dto.response.UserProfileResponse;
 import com.certification.backend.dto.response.UserResponse;
 import com.certification.backend.entity.User;
 import com.certification.backend.enums.ResultCodeEnum;
@@ -177,6 +178,34 @@ public class UserServiceImpl implements UserService {
         }
         log.info("批量导入完成: 成功{}条", successCount);
         return successCount;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
+        return toProfileResponse(user);
+    }
+
+    /**
+     * User Entity -> UserProfileResponse VO
+     */
+    private UserProfileResponse toProfileResponse(User user) {
+        UserProfileResponse resp = new UserProfileResponse();
+        resp.setId(user.getId());
+        resp.setUsername(user.getUsername());
+        resp.setName(user.getName());
+        resp.setRole(user.getRole());
+        resp.setPhone(user.getPhone());
+        resp.setEmail(user.getEmail());
+        resp.setDepartment(user.getDepartment());
+        resp.setTitle(user.getTitle());
+        resp.setOffice(user.getOffice());
+        resp.setMajor(user.getMajor());
+        resp.setGrade(user.getGrade());
+        resp.setClassName(user.getClassName());
+        return resp;
     }
 
     /**

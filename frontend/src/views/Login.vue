@@ -127,15 +127,6 @@
                 </div>
               </div>
             </el-form-item>
-
-            <!-- 角色选择（测试用） -->
-            <el-form-item prop="role">
-              <el-select v-model="loginForm.role" placeholder="选择登录角色" style="width: 100%">
-                <el-option label=" 学生" value="学生" />
-                <el-option label=" 教师" value="教师" />
-                <el-option label=" 管理员" value="管理员" />
-              </el-select>
-            </el-form-item>
           </el-form>
 
           <!-- 锁定提示 -->
@@ -246,6 +237,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import request from '@/api/request'
 import {
   School,
   WarningFilled,
@@ -264,8 +256,7 @@ const loading = ref(false)
 // ============ 登录表单 ============
 const loginForm = ref({
   username: '',
-  password: '',
-  role: '学生'
+  password: ''
 })
 
 // ============ 密码校验状态 ============
@@ -465,8 +456,9 @@ const loginRules = {
     { required: true, message: '请输入工号', trigger: 'blur' }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    {
+    { required: true, message: '请输入密码', trigger: 'blur' }
+    // 测试环境：不强制密码复杂度，生产环境可取消注释
+    /* ,{
       validator: (rule, value, callback) => {
         if (!value) {
           callback(new Error('请输入密码'))
@@ -479,10 +471,7 @@ const loginRules = {
         callback()
       },
       trigger: 'blur'
-    }
-  ],
-  role: [
-    { required: true, message: '请选择角色', trigger: 'change' }
+    } */
   ]
 }
 
@@ -517,69 +506,87 @@ const handleLogin = () => {
     loading.value = true
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // 调用后端登录 API
+      const res = await request.post('/auth/login', {
+        username: loginForm.value.username,
+        password: loginForm.value.password
+      })
 
-      if (!isPasswordValid.value) {
-        recordFailedAttempt()
-        ElMessage.error('密码至少8位，需包含数字和大小写字母')
-        loading.value = false
-        return
+      if (res.status === 'success' && res.data) {
+        const { token, userId, username, name, role } = res.data
+        // 保存登录信息
+        localStorage.setItem('token', token)
+        localStorage.setItem('userId', userId)
+        localStorage.setItem('userRole', role)      // 后端返回的是英文: admin, teacher, student
+        localStorage.setItem('username', username)
+        localStorage.setItem('displayName', name)
+
+        resetLoginAttempts()
+
+        if (rememberMe.value) {
+          localStorage.setItem('rememberMe', 'true')
+          localStorage.setItem('savedUsername', loginForm.value.username)
+        } else {
+          localStorage.removeItem('rememberMe')
+          localStorage.removeItem('savedUsername')
+        }
+
+        ElMessage.success(`欢迎回来，${name || username}`)
+        
+        // 根据角色跳转
+        router.push(getHomePath(role || 'student'))
       }
-
-      if (loginForm.value.username.length < 4) {
-        recordFailedAttempt()
-        ElMessage.error('工号格式不正确')
-        loading.value = false
-        return
-      }
-
-      // 登录成功
-      const token = 'mock-token-' + Date.now()
-      localStorage.setItem('token', token)
-      localStorage.setItem('userRole', loginForm.value.role)
-      localStorage.setItem('username', loginForm.value.username)
-
-      resetLoginAttempts()
-
-      if (rememberMe.value) {
-        localStorage.setItem('rememberMe', 'true')
-        localStorage.setItem('savedUsername', loginForm.value.username)
-      } else {
-        localStorage.removeItem('rememberMe')
-        localStorage.removeItem('savedUsername')
-      }
-
-      ElMessage.success(`欢迎回来，${loginForm.value.username}（${loginForm.value.role}）`)
-      router.push(getHomePath(loginForm.value.role))
     } catch (error) {
       recordFailedAttempt()
-      ElMessage.error('登录失败，请检查账号密码')
+      // 响应拦截器已显示错误消息，不需要再次显示
     } finally {
       loading.value = false
     }
   })
 }
 
-// ============ 快速登录 ============
-const quickLogin = (role) => {
-  const nameMap = {
-    '学生': '张明',
-    '教师': '王教授',
-    '管理员': 'admin'
+// ============ 快速登录（使用测试账号） ============
+const quickLogin = async (displayRole) => {
+  const accounts = {
+    '学生': { username: 'student01', password: '123456' },
+    '教师': { username: 'teacher01', password: '123456' },
+    '管理员': { username: 'admin', password: '123456' }
+  }
+
+  const account = accounts[displayRole]
+  if (!account) {
+    ElMessage.error('未知角色')
+    return
   }
 
   resetLoginAttempts()
+  loading.value = true
 
-  localStorage.setItem('token', 'mock-token-' + Date.now())
-  localStorage.setItem('userRole', role)
-  localStorage.setItem('username', nameMap[role])
+  try {
+    const res = await request.post('/auth/login', account)
 
-  ElMessage.success(`以 ${role} 身份快速登录成功`)
-  router.push(getHomePath(role))
+    if (res.status === 'success' && res.data) {
+      const { token, userId, username, name, role } = res.data
+      localStorage.setItem('token', token)
+      localStorage.setItem('userId', userId)
+      localStorage.setItem('userRole', role)
+      localStorage.setItem('username', username)
+      localStorage.setItem('displayName', name)
+
+      ElMessage.success(`以 ${name || displayRole} 身份快速登录成功`)
+      
+      router.push(getHomePath(role || 'student'))
+    }
+  } catch (error) {
+    recordFailedAttempt()
+    // 响应拦截器已显示错误消息
+  } finally {
+    loading.value = false
+  }
 }
 
 const getHomePath = (role) => {
-  return role === '学生' ? '/my-courses' : '/dashboard'
+  return role === 'student' ? '/my-courses' : '/dashboard'
 }
 
 // ============ 恢复记住的账号 ============

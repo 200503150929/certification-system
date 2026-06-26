@@ -1,36 +1,42 @@
 <template>
   <div class="my-courses-container">
-    <el-card>
+    <el-card v-loading="loading">
       <template #header>
         <div class="card-header">
           <span>{{ pageTitle }}</span>
-          <el-select v-model="selectedSemester" placeholder="选择学期" style="width: 150px">
+          <el-select v-model="selectedSemester" placeholder="选择学期" style="width: 200px" clearable>
             <el-option label="全部学期" value="all" />
-            <el-option label="2024-2025学年第一学期" value="2024-1" />
-            <el-option label="2024-2025学年第二学期" value="2024-2" />
-            <el-option label="2023-2024学年第一学期" value="2023-1" />
+            <el-option
+              v-for="sem in semesterOptions"
+              :key="sem.value"
+              :label="sem.label"
+              :value="sem.value"
+            />
           </el-select>
         </div>
       </template>
 
       <!-- 按学期分组 -->
-      <div v-for="group in filteredCourses" :key="group.semester" class="course-group">
-        <h3 class="semester-title">{{ group.semester }}</h3>
+      <div v-for="group in groupedCourses" :key="group.key" class="course-group">
+        <h3 class="semester-title">{{ group.label }}</h3>
         <div class="course-grid">
           <el-card
             v-for="course in group.courses"
-            :key="course.id"
+            :key="course.offeringId"
             class="course-card"
-            @click="goToDetail(course.id)"
+            @click="goToDetail(course)"
           >
             <div class="course-info">
-              <h4>{{ course.name }}</h4>
-              <p class="course-code">课程代码：{{ course.code }}</p>
-              <p class="course-teacher">授课教师：{{ course.teacher }}</p>
+              <h4>{{ course.courseName }}</h4>
+              <p class="course-code">课程代码：{{ course.courseCode }}</p>
+              <p class="course-teacher">授课教师：{{ course.teacherName || '-' }}</p>
               <div class="course-meta">
                 <el-tag size="small" type="info">{{ course.credits }} 学分</el-tag>
-                <el-tag size="small" :type="getStatusType(course.status)">
-                  {{ course.status }}
+                <el-tag size="small" :type="course.isRequired ? 'danger' : 'warning'">
+                  {{ course.isRequired ? '必修' : '选修' }}
+                </el-tag>
+                <el-tag size="small" v-if="course.courseType" type="success">
+                  {{ course.courseType }}
                 </el-tag>
               </div>
             </div>
@@ -39,66 +45,109 @@
       </div>
 
       <!-- 空状态 -->
-      <el-empty v-if="filteredCourses.length === 0" description="暂无课程" />
+      <el-empty v-if="!loading && groupedCourses.length === 0" description="暂无课程数据" />
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import request from '@/api/request';
 
 const router = useRouter();
-
+const loading = ref(false);
 const selectedSemester = ref('all');
-const userRole = ref(localStorage.getItem('userRole') || '学生');
-const pageTitle = computed(() => userRole.value === '教师' ? '课程管理' : '我的课程');
 
-// 模拟课程数据
-const courseData = ref([
-  {
-    semester: '2024-2025学年第一学期',
-    courses: [
-      { id: 1, name: '数据结构与算法', code: 'CS301', teacher: '王教授', credits: 3, status: '进行中' },
-      { id: 2, name: '操作系统', code: 'CS302', teacher: '李教授', credits: 3, status: '进行中' },
-      { id: 3, name: '数据库系统', code: 'CS303', teacher: '张教授', credits: 2, status: '已结束' },
-    ]
-  },
-  {
-    semester: '2023-2024学年第二学期',
-    courses: [
-      { id: 4, name: '计算机网络', code: 'CS201', teacher: '赵教授', credits: 3, status: '已结束' },
-      { id: 5, name: '软件工程', code: 'CS202', teacher: '刘教授', credits: 2, status: '已结束' },
-    ]
-  }
-]);
+const userRole = ref(localStorage.getItem('userRole') || 'student');
+const pageTitle = computed(() => userRole.value === 'teacher' ? '课程管理' : '我的课程');
 
-const filteredCourses = computed(() => {
-  const currentTeacher = localStorage.getItem('username') || '';
-  const groups = userRole.value === '教师'
-    ? courseData.value
-        .map(group => ({
-          ...group,
-          courses: group.courses.filter(course => course.teacher === currentTeacher)
-        }))
-        .filter(group => group.courses.length > 0)
-    : courseData.value;
+// 从后端获取的课程数据
+const courses = ref([]);
 
-  if (selectedSemester.value === 'all') return groups;
-  return groups.filter(g => g.semester === selectedSemester.value);
+// 学期选项（从数据中提取）
+const semesterOptions = computed(() => {
+  const semSet = new Set();
+  courses.value.forEach(c => {
+    if (c.academicYear && c.semester) {
+      semSet.add(c.academicYear + ' ' + c.semester);
+    }
+  });
+  return Array.from(semSet).sort().reverse().map(s => ({
+    label: s,
+    value: s
+  }));
 });
 
-const getStatusType = (status) => {
-  const map = { '进行中': 'primary', '已结束': 'info', '未开始': 'warning' };
-  return map[status] || 'info';
+// 按学期分组并筛选
+const groupedCourses = computed(() => {
+  const groups = {};
+  courses.value.forEach(course => {
+    const key = (course.academicYear || '') + ' ' + (course.semester || '');
+    if (selectedSemester.value !== 'all' && key !== selectedSemester.value) return;
+    if (!groups[key]) {
+      groups[key] = [];
+    }
+    groups[key].push(course);
+  });
+  // 转换为数组并按学期反序排列
+  return Object.entries(groups)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([key, courses]) => ({
+      key,
+      label: key || '未知学期',
+      courses
+    }));
+});
+
+// 从后端加载课程（学生和教师调用不同API）
+const loadCourses = async () => {
+  loading.value = true;
+  try {
+    if (userRole.value === 'teacher') {
+      // 教师端：调用教师开课列表API
+      const res = await request.get('/teacher/offering/list', {
+        params: { pageNum: 1, pageSize: 100 }
+      });
+      if (res.data && res.data.list) {
+        // 将教师开课数据映射为统一格式
+        courses.value = res.data.list.map(item => ({
+          offeringId: item.id,
+          courseId: item.courseId,
+          courseCode: item.courseCode,
+          courseName: item.courseName,
+          credits: null,
+          teacherName: item.teacherName,
+          academicYear: item.academicYear,
+          semester: item.semester,
+          courseType: null,
+          isRequired: null
+        }));
+      }
+    } else {
+      // 学生端：调用学生课程API
+      const res = await request.get('/student/courses');
+      if (res.data) {
+        courses.value = res.data;
+      }
+    }
+  } catch (error) {
+    console.error('加载课程列表失败:', error);
+  } finally {
+    loading.value = false;
+  }
 };
 
-const goToDetail = (courseId) => {
-  if (userRole.value === '教师') {
-    router.push(`/teacher/course/${courseId}`);
+onMounted(() => {
+  loadCourses();
+});
+
+const goToDetail = (course) => {
+  if (userRole.value === 'teacher') {
+    router.push(`/teacher/course/${course.offeringId}`);
     return;
   }
-  router.push(`/course/${courseId}`);
+  router.push(`/course/${course.courseId}`);
 };
 </script>
 
@@ -149,5 +198,6 @@ const goToDetail = (courseId) => {
   margin-top: 12px;
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 </style>

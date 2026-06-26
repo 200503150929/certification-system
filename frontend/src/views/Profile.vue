@@ -1,6 +1,6 @@
 <template>
   <div class="profile-container">
-    <el-card class="profile-card">
+    <el-card class="profile-card" v-loading="loading">
       <template #header>
         <div class="card-header">
           <span>个人信息</span>
@@ -17,6 +17,7 @@
             <span class="avatar-text">{{ userInfo.name?.charAt(0) }}</span>
           </el-avatar>
           <h3>{{ userInfo.name }}</h3>
+          <el-tag :type="roleTagType">{{ roleText }}</el-tag>
         </div>
 
         <!-- 右侧：信息列表 -->
@@ -24,47 +25,50 @@
           <el-descriptions :column="2" border>
             <!-- 共同字段 -->
             <el-descriptions-item label="工号/学号">
-              {{ userInfo.id }}
+              {{ userInfo.username }}
             </el-descriptions-item>
             <el-descriptions-item label="姓名">
               {{ userInfo.name }}
             </el-descriptions-item>
 
             <!-- 教师特有字段 -->
-            <template v-if="userInfo.role === '教师'">
+            <template v-if="userInfo.role === 'teacher'">
               <el-descriptions-item label="院系">
-                {{ userInfo.department }}
+                {{ userInfo.department || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="职称">
-                {{ userInfo.title }}
+                {{ userInfo.title || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="办公地点">
-                {{ userInfo.office }}
+                {{ userInfo.office || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="邮箱">
-                {{ userInfo.email }}
+                {{ userInfo.email || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="联系电话">
-                {{ userInfo.phone }}
+                {{ userInfo.phone || '-' }}
               </el-descriptions-item>
             </template>
 
             <!-- 学生特有字段 -->
-            <template v-if="userInfo.role === '学生'">
+            <template v-if="userInfo.role === 'student'">
+              <el-descriptions-item label="院系">
+                {{ userInfo.department || '-' }}
+              </el-descriptions-item>
               <el-descriptions-item label="专业">
-                {{ userInfo.major }}
+                {{ userInfo.major || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="年级">
-                {{ userInfo.grade }}
+                {{ userInfo.grade || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="班级">
-                {{ userInfo.class }}
+                {{ userInfo.className || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="联系电话">
-                {{ userInfo.phone }}
+                {{ userInfo.phone || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="邮箱">
-                {{ userInfo.email }}
+                {{ userInfo.email || '-' }}
               </el-descriptions-item>
             </template>
           </el-descriptions>
@@ -95,34 +99,34 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue';
+import { ref, reactive, computed, onMounted } from 'vue';
 import { Edit } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
+import request from '@/api/request';
 
-// 模拟当前用户角色（实际从 store 获取）
-const userRole = ref('学生'); // 或 '教师'
-
+const loading = ref(false);
 const userInfo = ref({
-  id: '2024001',
-  name: '张明',
-  role: '学生',
-  major: '计算机科学与技术',
-  grade: '2024级',
-  class: '1班',
-  phone: '138****1234',
-  email: 'zhangming@edu.cn'
+  username: '',
+  name: '',
+  role: '',
+  department: '',
+  title: '',
+  office: '',
+  major: '',
+  grade: '',
+  className: '',
+  phone: '',
+  email: ''
 });
 
-// 教师数据示例
-const teacherInfo = ref({
-  id: 'T2024001',
-  name: '王教授',
-  role: '教师',
-  department: '计算机学院',
-  title: '副教授',
-  office: '计算机楼 A305',
-  phone: '139****5678',
-  email: 'wang@edu.cn'
+const roleText = computed(() => {
+  const map = { admin: '管理员', teacher: '教师', student: '学生' };
+  return map[userInfo.value.role] || userInfo.value.role;
+});
+
+const roleTagType = computed(() => {
+  const map = { admin: 'danger', teacher: 'warning', student: 'success' };
+  return map[userInfo.value.role] || 'info';
 });
 
 const dialogVisible = ref(false);
@@ -140,29 +144,28 @@ const formRules = {
   ]
 };
 
-onMounted(() => {
-  // 实际从 API 获取用户信息
-  // userInfo.value = await getUserInfo()
-  // 根据角色加载不同数据
-  const currentRole = localStorage.getItem('userRole') || '学生';
-  const currentName = localStorage.getItem('username');
-  userRole.value = currentRole;
-  if (currentRole === '教师') {
-    userInfo.value = {
-      ...teacherInfo.value,
-      name: currentName || teacherInfo.value.name
-    };
-  } else {
-    userInfo.value = {
-      ...userInfo.value,
-      name: currentName || userInfo.value.name
-    };
+// 从后端加载用户个人信息
+const loadProfile = async () => {
+  loading.value = true;
+  try {
+    const res = await request.get('/user/profile');
+    if (res.data) {
+      userInfo.value = res.data;
+    }
+  } catch (error) {
+    console.error('加载个人信息失败:', error);
+  } finally {
+    loading.value = false;
   }
+};
+
+onMounted(() => {
+  loadProfile();
 });
 
 const handleEdit = () => {
-  formData.phone = userInfo.value.phone;
-  formData.email = userInfo.value.email;
+  formData.phone = userInfo.value.phone || '';
+  formData.email = userInfo.value.email || '';
   dialogVisible.value = true;
 };
 

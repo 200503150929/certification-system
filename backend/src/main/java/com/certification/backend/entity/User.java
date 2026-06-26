@@ -15,7 +15,7 @@ public class User {
     @Column(unique = true, nullable = false, length = 12) //工号/学号/管理员账号
     private String username;
 
-    @Column(nullable = false, length = 60)
+    @Column(nullable = false, length = 100)
     private String password;
 
     @Column(length = 10)
@@ -32,6 +32,21 @@ public class User {
 
     @Column(length = 50)
     private String department;//院系
+
+    @Column(length = 30)
+    private String title;//职称（教师）
+
+    @Column(length = 50)
+    private String office;//办公地点（教师）
+
+    @Column(length = 50)
+    private String major;//专业（学生）
+
+    @Column(length = 20)
+    private String grade;//年级（学生），如 2024级
+
+    @Column(name = "class_name", length = 20)
+    private String className;//班级（学生），如 1班
 
     /**
      * 状态：1 正常，0 停用

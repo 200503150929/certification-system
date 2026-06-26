@@ -18,21 +18,21 @@
         :collapse-transition="false"
       >
         <!-- 仪表盘 -->
-        <el-menu-item v-if="userRole !== '学生'" index="/dashboard">
+        <el-menu-item v-if="userRole !== 'student'" index="/dashboard">
           <el-icon><Monitor /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
 
         <!-- 个人信息（学生/教师共用） -->
-        <el-menu-item v-if="userRole !== '管理员'" index="/profile">
+        <el-menu-item v-if="userRole !== 'admin'" index="/profile">
           <el-icon><User /></el-icon>
           <span>个人信息</span>
         </el-menu-item>
 
         <!-- 我的课程（学生端）/ 课程管理（教师端） -->
-        <el-menu-item v-if="userRole !== '管理员'" index="/my-courses">
+        <el-menu-item v-if="userRole !== 'admin'" index="/my-courses">
           <el-icon><Document /></el-icon>
-          <span>{{ userRole === '学生' ? '我的课程' : '课程管理' }}</span>
+          <span>{{ userRole === 'student' ? '我的课程' : '课程管理' }}</span>
         </el-menu-item>
 
         <!-- 课程管理（管理员按专业管理） -->
@@ -51,7 +51,7 @@
         </el-sub-menu>
 
         <!-- ============ 模块二：人才培养方案管理（仅管理员） ============ -->
-        <el-sub-menu v-if="userRole === '管理员'" index="curriculum">
+        <el-sub-menu v-if="userRole === 'admin'" index="curriculum">
           <template #title>
             <el-icon><DocumentCopy /></el-icon>
             <span>人才培养方案</span>
@@ -63,7 +63,7 @@
         </el-sub-menu>
 
         <!-- 角色权限（仅管理员可见） -->
-        <el-sub-menu v-if="userRole === '管理员'" index="roles">
+        <el-sub-menu v-if="userRole === 'admin'" index="roles">
           <template #title>
             <el-icon><Connection /></el-icon>
             <span>角色权限</span>
@@ -123,7 +123,7 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item v-if="userRole !== '管理员'" command="profile">
+                <el-dropdown-item v-if="userRole !== 'admin'" command="profile">
                   <el-icon><User /></el-icon>
                   个人中心
                 </el-dropdown-item>
@@ -189,7 +189,7 @@ const notificationCount = ref(3)
 // ============ 用户信息 ============
 const userInfo = ref({
   name: '张明',
-  role: '学生' // 可选: '学生' | '教师' | '管理员'
+  role: 'student' // 可选: 'student' | 'teacher' | 'admin'
 })
 
 const userRole = computed(() => userInfo.value.role)
@@ -215,9 +215,9 @@ const breadcrumbParent = computed(() => {
   // 模块七：个人信息与课程
   if (path.startsWith('/profile')) return '个人中心'
   if (path.startsWith('/courses/program')) return '课程管理'
-  if (path.startsWith('/my-courses')) return userRole.value === '学生' ? '课程学习' : '课程管理'
+  if (path.startsWith('/my-courses')) return userRole.value === 'student' ? '课程学习' : '课程管理'
   if (path.startsWith('/teacher/course')) return '课程管理'
-  if (path.startsWith('/course')) return userRole.value === '学生' ? '课程学习' : '课程管理'
+  if (path.startsWith('/course')) return userRole.value === 'student' ? '课程学习' : '课程管理'
   
   // 系统管理
   if (path.startsWith('/users')) return '系统管理'
@@ -247,7 +247,7 @@ const toggleCollapse = () => {
 const handleCommand = (command) => {
   switch (command) {
     case 'profile':
-      if (userRole.value !== '管理员') {
+      if (userRole.value !== 'admin') {
         router.push('/profile')
       }
       break
@@ -297,7 +297,7 @@ const handleLogout = () => {
 
 // ============ 加载用户信息 ============
 const loadUserInfo = () => {
-  const role = localStorage.getItem('userRole') || '学生'
+  const role = localStorage.getItem('userRole') || 'student'
   const name = localStorage.getItem('username') || '张明'
   
   userInfo.value.role = role

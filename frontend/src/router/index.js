@@ -38,7 +38,7 @@ const router = createRouter({
     {
       path: '/',
       component: Layout,
-      redirect: () => (getUserRole() === '学生' ? '/my-courses' : '/dashboard'),
+      redirect: () => (getUserRole() === 'student' ? '/my-courses' : '/dashboard'),
       meta: { requiresAuth: true },
       children: [
         // ----- 仪表盘（管理员/教师） -----
@@ -49,7 +49,7 @@ const router = createRouter({
           meta: {
             title: '数据看板',
             icon: 'Monitor',
-            roles: ['管理员', '教师']
+            roles: ['admin', 'teacher']
           }
         },
 
@@ -61,7 +61,7 @@ const router = createRouter({
           meta: {
             title: '个人信息',
             icon: 'User',
-            roles: ['教师', '学生']
+            roles: ['teacher', 'student']
           }
         },
 
@@ -73,7 +73,7 @@ const router = createRouter({
           meta: {
             title: '我的课程',
             icon: 'Document',
-            roles: ['教师', '学生']
+            roles: ['teacher', 'student']
           }
         },
 
@@ -85,7 +85,7 @@ const router = createRouter({
           meta: {
             title: '课程管理',
             icon: 'Document',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -96,7 +96,7 @@ const router = createRouter({
           component: CourseDetail,
           meta: {
             title: '课程详情',
-            roles: ['学生']
+            roles: ['student']
           }
         },
 
@@ -107,7 +107,7 @@ const router = createRouter({
           component: TeacherCourseManage,
           meta: {
             title: '课程管理',
-            roles: ['教师']
+            roles: ['teacher']
           }
         },
 
@@ -119,7 +119,7 @@ const router = createRouter({
           meta: {
             title: '学生名单',
             icon: 'UserFilled',
-            roles: ['教师']
+            roles: ['teacher']
           }
         },
 
@@ -131,7 +131,7 @@ const router = createRouter({
           meta: {
             title: '用户管理',
             icon: 'UserFilled',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -143,7 +143,7 @@ const router = createRouter({
           meta: {
             title: '角色权限',
             icon: 'Connection',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -156,7 +156,7 @@ const router = createRouter({
           meta: {
             title: '专业管理',
             icon: 'DocumentCopy',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -168,7 +168,7 @@ const router = createRouter({
           meta: {
             title: '培养目标管理',
             icon: 'DocumentAdd',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -180,7 +180,7 @@ const router = createRouter({
           meta: {
             title: '毕业要求管理',
             icon: 'DocumentChecked',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -192,7 +192,7 @@ const router = createRouter({
           meta: {
             title: '指标点管理',
             icon: 'List',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -204,7 +204,7 @@ const router = createRouter({
           meta: {
             title: '支撑矩阵',
             icon: 'Grid',
-            roles: ['管理员']
+            roles: ['admin']
           }
         },
 
@@ -243,13 +243,15 @@ const router = createRouter({
 })
 
 // ============ 路由守卫 ============
-// 获取用户角色（从 localStorage 获取）
+// 获取用户角色（从 localStorage 获取，后端返回英文角色名）
 const getUserRole = () => {
-  return localStorage.getItem('userRole') || '学生'
+  return localStorage.getItem('userRole') || 'student'
 }
 
 const getHomePath = (userRole) => {
-  return userRole === '学生' ? '/my-courses' : '/dashboard'
+  // userRole 是英文: admin, teacher, student
+  if (userRole === 'student') return '/my-courses'
+  return '/dashboard'
 }
 
 // 检查是否有权限访问
