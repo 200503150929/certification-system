@@ -4,57 +4,81 @@
       <template #header>
         <div class="card-header">
           <span>专业管理</span>
-          <el-button type="primary" :icon="Plus" @click="handleAdd">新增专业</el-button>
+          <div>
+            <el-button type="primary" :icon="Plus" @click="handleAdd">新增专业</el-button>
+          </div>
         </div>
       </template>
 
-      <!-- 当前专业 -->
-      <div class="current-program">
-        <div class="program-selector">
-          <span class="label">当前专业：</span>
-          <el-select
-            v-model="currentProgram"
-            placeholder="请选择专业"
-            style="width: 300px"
-            @change="handleProgramChange"
-          >
-            <el-option
-              v-for="item in programList"
-              :key="item.id"
-              :label="item.name"
-              :value="item.id"
-            />
-          </el-select>
-          <el-tag type="success" size="large" style="margin-left: 12px">
-            {{ getProgramStatus(currentProgram) }}
-          </el-tag>
-        </div>
-        <div class="program-actions">
-          <el-button :icon="Edit" text @click="handleEditProgram">编辑</el-button>
-          <el-button :icon="Delete" text type="danger" @click="handleDeleteProgram">删除</el-button>
-        </div>
+      <!-- 搜索栏 -->
+      <div class="search-bar">
+        <el-input
+          v-model="searchName"
+          placeholder="搜索专业名称"
+          clearable
+          style="width: 240px"
+          @keyup.enter="handleSearch"
+        />
+        <el-select v-model="searchStatus" placeholder="状态筛选" clearable style="width: 140px; margin-left: 12px">
+          <el-option label="已发布" value="published" />
+          <el-option label="草稿" value="draft" />
+        </el-select>
+        <el-button type="primary" @click="handleSearch" style="margin-left: 12px">搜索</el-button>
       </div>
 
       <!-- 专业列表 -->
-      <el-table :data="programList" border style="width: 100%; margin-top: 20px">
-        <el-table-column prop="code" label="专业代码" width="120" />
-        <el-table-column prop="name" label="专业名称" />
-        <el-table-column prop="department" label="所属院系" width="150" />
+      <el-table :data="programList" border style="width: 100%; margin-top: 20px" v-loading="loading">
+        <el-table-column prop="majorName" label="专业名称" min-width="200" />
+        <el-table-column prop="version" label="版本号" width="120">
+          <template #default="scope">
+            <el-tag>v{{ scope.row.version }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
           <template #default="scope">
-            <el-tag :type="scope.row.status === '已发布' ? 'success' : 'warning'">
-              {{ scope.row.status }}
+            <el-tag :type="scope.row.status === 'published' ? 'success' : 'warning'">
+              {{ scope.row.status === 'published' ? '已发布' : '草稿' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="version" label="当前版本" width="120" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="createdAt" label="创建时间" width="180" />
+        <el-table-column label="操作" width="360" fixed="right">
           <template #default="scope">
             <el-button link type="primary" @click="goToGoals(scope.row)">培养目标</el-button>
             <el-button link type="primary" @click="goToRequirements(scope.row)">毕业要求</el-button>
+            <el-button link type="primary" @click="goToMatrix(scope.row)">支撑矩阵</el-button>
+            <el-button link type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button
+              v-if="scope.row.status === 'draft'"
+              link type="success"
+              @click="handlePublish(scope.row.id)"
+            >
+              发布
+            </el-button>
+            <el-button
+              v-if="scope.row.status === 'published'"
+              link type="warning"
+              @click="handleUnpublish(scope.row.id)"
+            >
+              取消发布
+            </el-button>
+            <el-button link type="danger" @click="handleDelete(scope.row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <!-- 分页 -->
+      <div class="pagination-wrap" v-if="total > 0">
+        <el-pagination
+          v-model:current-page="page"
+          v-model:page-size="pageSize"
+          :total="total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          @size-change="loadPrograms"
+          @current-change="loadPrograms"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑专业弹窗 -->
@@ -65,25 +89,22 @@
       @close="resetForm"
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px">
-        <el-form-item label="专业代码" prop="code">
-          <el-input v-model="formData.code" placeholder="请输入专业代码" />
+        <el-form-item label="专业名称" prop="majorName">
+          <el-input v-model="formData.majorName" placeholder="请输入专业名称" />
         </el-form-item>
-        <el-form-item label="专业名称" prop="name">
-          <el-input v-model="formData.name" placeholder="请输入专业名称" />
-        </el-form-item>
-        <el-form-item label="所属院系" prop="department">
-          <el-input v-model="formData.department" placeholder="请输入所属院系" />
+        <el-form-item label="版本号" prop="version">
+          <el-input v-model="formData.version" placeholder="如：1.0" />
         </el-form-item>
         <el-form-item label="状态" prop="status">
           <el-radio-group v-model="formData.status">
-            <el-radio label="草稿">草稿</el-radio>
-            <el-radio label="已发布">已发布</el-radio>
+            <el-radio value="draft">草稿</el-radio>
+            <el-radio value="published">已发布</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitForm">确认</el-button>
+        <el-button type="primary" @click="submitForm" :loading="submitting">确认</el-button>
       </template>
     </el-dialog>
   </div>
@@ -93,17 +114,19 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Edit, Delete } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
+import request from '@/api/request'
 
 const router = useRouter()
 
-const currentProgram = ref('')
-const programList = ref([
-  { id: '1', code: '080901', name: '计算机科学与技术', department: '计算机学院', status: '已发布', version: 'v2.0' },
-  { id: '2', code: '080902', name: '软件工程', department: '计算机学院', status: '已发布', version: 'v1.5' },
-  { id: '3', code: '080903', name: '数据科学与大数据技术', department: '计算机学院', status: '草稿', version: 'v0.8' },
-  { id: '4', code: '080904', name: '人工智能', department: '计算机学院', status: '草稿', version: 'v0.3' },
-])
+const programList = ref([])
+const loading = ref(false)
+const submitting = ref(false)
+const page = ref(1)
+const pageSize = ref(10)
+const total = ref(0)
+const searchName = ref('')
+const searchStatus = ref('')
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('新增专业')
@@ -112,89 +135,127 @@ const isEdit = ref(false)
 const editId = ref('')
 
 const formData = reactive({
-  code: '',
-  name: '',
-  department: '',
-  status: '草稿'
+  majorName: '',
+  version: '1.0',
+  status: 'draft'
 })
 
 const formRules = {
-  code: [{ required: true, message: '请输入专业代码', trigger: 'blur' }],
-  name: [{ required: true, message: '请输入专业名称', trigger: 'blur' }],
-  department: [{ required: true, message: '请输入所属院系', trigger: 'blur' }]
+  majorName: [{ required: true, message: '请输入专业名称', trigger: 'blur' }],
+  version: [{ required: true, message: '请输入版本号', trigger: 'blur' }]
 }
 
-const getProgramStatus = (id) => {
-  const program = programList.value.find(p => p.id === id)
-  return program ? program.status : ''
+// 加载专业列表
+const loadPrograms = async () => {
+  loading.value = true
+  try {
+    const params = {
+      page: page.value,
+      pageSize: pageSize.value
+    }
+    if (searchName.value) params.majorNameFuzzy = searchName.value
+    if (searchStatus.value) params.status = searchStatus.value
+    const res = await request.get('/admin/program/list', { params })
+    programList.value = res.data?.records || []
+    total.value = res.data?.total || 0
+  } catch (e) {
+    ElMessage.error(e.message || '加载专业列表失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleProgramChange = (val) => {
-  ElMessage.success(`已切换到：${programList.value.find(p => p.id === val)?.name}`)
+const handleSearch = () => {
+  page.value = 1
+  loadPrograms()
 }
 
 const handleAdd = () => {
   dialogTitle.value = '新增专业'
   isEdit.value = false
+  formData.majorName = ''
+  formData.version = '1.0'
+  formData.status = 'draft'
   dialogVisible.value = true
 }
 
-const handleEditProgram = () => {
-  if (!currentProgram.value) {
-    ElMessage.warning('请先选择专业')
-    return
-  }
-  const program = programList.value.find(p => p.id === currentProgram.value)
-  if (program) {
-    dialogTitle.value = '编辑专业'
-    isEdit.value = true
-    editId.value = program.id
-    Object.assign(formData, program)
-    dialogVisible.value = true
+const handleEdit = (row) => {
+  dialogTitle.value = '编辑专业'
+  isEdit.value = true
+  editId.value = row.id
+  formData.majorName = row.majorName || ''
+  formData.version = row.version || ''
+  formData.status = row.status || 'draft'
+  dialogVisible.value = true
+}
+
+const handleDelete = (id) => {
+  ElMessageBox.confirm('确定要删除该专业吗？删除后将级联删除培养目标、毕业要求、指标点等关联数据。', '提示', {
+    type: 'warning',
+    confirmButtonText: '确定删除',
+    cancelButtonText: '取消'
+  }).then(async () => {
+    try {
+      await request.delete(`/admin/program/delete/${id}`)
+      ElMessage.success('删除成功')
+      loadPrograms()
+    } catch (e) {
+      ElMessage.error(e.message || '删除失败')
+    }
+  }).catch(() => {})
+}
+
+const handlePublish = async (id) => {
+  try {
+    await request.put(`/admin/program/publish/${id}`)
+    ElMessage.success('发布成功')
+    loadPrograms()
+  } catch (e) {
+    ElMessage.error(e.message || '发布失败')
   }
 }
 
-const handleDeleteProgram = () => {
-  if (!currentProgram.value) {
-    ElMessage.warning('请先选择专业')
-    return
+const handleUnpublish = async (id) => {
+  try {
+    await request.put(`/admin/program/unpublish/${id}`)
+    ElMessage.success('已取消发布')
+    loadPrograms()
+  } catch (e) {
+    ElMessage.error(e.message || '操作失败')
   }
-  ElMessageBox.confirm('确定要删除该专业吗？', '提示', { type: 'warning' }).then(() => {
-    const index = programList.value.findIndex(p => p.id === currentProgram.value)
-    if (index !== -1) {
-      programList.value.splice(index, 1)
-      currentProgram.value = programList.value.length > 0 ? programList.value[0].id : ''
-      ElMessage.success('删除成功')
-    }
-  })
 }
 
 const submitForm = () => {
-  formRef.value.validate((valid) => {
+  formRef.value.validate(async (valid) => {
     if (!valid) return
-    if (isEdit.value) {
-      const index = programList.value.findIndex(p => p.id === editId.value)
-      if (index !== -1) {
-        programList.value[index] = { ...formData, id: editId.value }
+    submitting.value = true
+    try {
+      const payload = {
+        majorName: formData.majorName,
+        version: formData.version,
+        status: formData.status
       }
-      ElMessage.success('更新成功')
-    } else {
-      const newProgram = {
-        ...formData,
-        id: String(Date.now()),
-        version: 'v0.1'
+      if (isEdit.value) {
+        payload.id = editId.value
+        await request.put('/admin/program/update', payload)
+        ElMessage.success('更新成功')
+      } else {
+        await request.post('/admin/program/add', payload)
+        ElMessage.success('新增成功')
       }
-      programList.value.push(newProgram)
-      ElMessage.success('新增成功')
+      dialogVisible.value = false
+      resetForm()
+      loadPrograms()
+    } catch (e) {
+      ElMessage.error(e.message || '操作失败')
+    } finally {
+      submitting.value = false
     }
-    dialogVisible.value = false
-    resetForm()
   })
 }
 
 const resetForm = () => {
   formRef.value?.resetFields()
-  Object.assign(formData, { code: '', name: '', department: '', status: '草稿' })
   isEdit.value = false
   editId.value = ''
 }
@@ -202,29 +263,31 @@ const resetForm = () => {
 const goToGoals = (row) => {
   router.push({ path: '/curriculum/goals', query: { programId: row.id } })
 }
+
 const goToRequirements = (row) => {
   router.push({ path: '/curriculum/requirements', query: { programId: row.id } })
 }
 
+const goToMatrix = (row) => {
+  router.push({ path: '/curriculum/matrix', query: { programId: row.id } })
+}
+
 onMounted(() => {
-  if (programList.value.length > 0) {
-    currentProgram.value = programList.value[0].id
-  }
+  loadPrograms()
 })
 </script>
 
 <style scoped>
 .curriculum-management-container { padding: 20px; }
 .card-header { display: flex; justify-content: space-between; align-items: center; }
-.current-program {
+.search-bar {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 20px;
-  background: #f7f8fa;
-  border-radius: 8px;
+  padding: 16px 0;
 }
-.program-selector { display: flex; align-items: center; gap: 10px; }
-.program-selector .label { font-weight: 600; color: #333; }
-.program-actions { display: flex; gap: 8px; }
+.pagination-wrap {
+  margin-top: 20px;
+  display: flex;
+  justify-content: flex-end;
+}
 </style>

@@ -1,23 +1,23 @@
 <template>
-  <div class="teacher-course-manage-container">
+  <div class="teacher-course-manage-container" v-loading="pageLoading">
     <el-card>
       <template #header>
         <div class="course-header">
           <div>
             <el-breadcrumb separator="/">
               <el-breadcrumb-item :to="{ path: '/my-courses' }">课程管理</el-breadcrumb-item>
-              <el-breadcrumb-item>{{ courseInfo.name }}</el-breadcrumb-item>
+              <el-breadcrumb-item>{{ courseInfo.courseName || '加载中...' }}</el-breadcrumb-item>
             </el-breadcrumb>
-            <h2 class="course-title">{{ courseInfo.name }}</h2>
+            <h2 class="course-title">{{ courseInfo.courseName }}</h2>
             <div class="course-meta">
-              <span>课程代码：{{ courseInfo.code }}</span>
+              <span>课程代码：{{ courseInfo.courseCode }}</span>
               <span>学分：{{ courseInfo.credits }}</span>
-              <span>授课教师：{{ courseInfo.teacher }}</span>
-              <span>班级：{{ courseInfo.className }}</span>
+              <span>授课教师：{{ courseInfo.teacherName }}</span>
+              <span>学年：{{ courseInfo.academicYear }} {{ courseInfo.semester }}</span>
             </div>
           </div>
-          <el-tag :type="getStatusType(courseInfo.status)" size="large">
-            {{ courseInfo.status }}
+          <el-tag type="primary" size="large">
+            {{ courseInfo.academicYear || '' }}
           </el-tag>
         </div>
       </template>
@@ -25,201 +25,471 @@
       <div class="summary-grid">
         <div class="summary-item">
           <p class="summary-label">学生人数</p>
-          <p class="summary-value">{{ students.length }}</p>
+          <p class="summary-value">{{ studentCount }}</p>
         </div>
         <div class="summary-item">
-          <p class="summary-label">作业数</p>
-          <p class="summary-value">{{ assignments.length }}</p>
+          <p class="summary-label">课程目标数</p>
+          <p class="summary-value">{{ objectiveCount }}</p>
         </div>
         <div class="summary-item">
-          <p class="summary-label">平均成绩</p>
-          <p class="summary-value">{{ averageScore }}</p>
+          <p class="summary-label">考核环节数</p>
+          <p class="summary-value">{{ assessmentCount }}</p>
         </div>
         <div class="summary-item">
-          <p class="summary-label">出勤率</p>
-          <p class="summary-value">{{ attendanceRate }}%</p>
+          <p class="summary-label">资源数</p>
+          <p class="summary-value">{{ resourceCount }}</p>
         </div>
       </div>
 
-      <el-tabs v-model="activeTab">
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange">
         <el-tab-pane label="学生名单" name="students">
           <div class="toolbar">
-            <el-input
-              v-model="studentKeyword"
-              placeholder="搜索姓名/学号"
-              style="width: 260px"
-            />
-            <el-button type="primary" :icon="Download" @click="handleExportStudents">导出名单</el-button>
+            <el-input v-model="studentKeyword" placeholder="搜索姓名/学号" style="width: 260px" clearable />
+            <el-button type="primary" :icon="Download">导出名单</el-button>
           </div>
-          <el-table :data="filteredStudents" border style="width: 100%">
-            <el-table-column prop="id" label="学号" width="120" />
-            <el-table-column prop="name" label="姓名" width="120" />
-            <el-table-column prop="major" label="专业" />
-            <el-table-column prop="class" label="班级" width="100" />
-            <el-table-column prop="phone" label="联系方式" width="150" />
-            <el-table-column prop="attendance" label="出勤率" width="100" />
+          <el-table :data="filteredStudents" border style="width: 100%" v-loading="studentsLoading">
+            <el-table-column prop="studentId" label="学号" width="120" />
+            <el-table-column prop="studentName" label="姓名" width="120" />
+            <el-table-column label="成绩" min-width="200">
+              <template #default="scope">
+                <span v-for="(g, idx) in scope.row.grades" :key="idx">
+                  <el-tag size="small" style="margin-right: 4px">{{ g.assessmentName }}: {{ g.score }}</el-tag>
+                </span>
+                <span v-if="!scope.row.grades || scope.row.grades.length === 0" style="color: #999">未录入</span>
+              </template>
+            </el-table-column>
           </el-table>
         </el-tab-pane>
 
         <el-tab-pane label="成绩录入" name="grades">
-          <el-table :data="gradeRows" border style="width: 100%">
-            <el-table-column prop="id" label="学号" width="120" />
-            <el-table-column prop="name" label="姓名" width="120" />
-            <el-table-column label="平时成绩" width="150">
-              <template #default="scope">
-                <el-input-number v-model="scope.row.daily" :min="0" :max="100" size="small" />
-              </template>
-            </el-table-column>
-            <el-table-column label="实验成绩" width="150">
-              <template #default="scope">
-                <el-input-number v-model="scope.row.lab" :min="0" :max="100" size="small" />
-              </template>
-            </el-table-column>
-            <el-table-column label="期末成绩" width="150">
-              <template #default="scope">
-                <el-input-number v-model="scope.row.final" :min="0" :max="100" size="small" />
-              </template>
-            </el-table-column>
-            <el-table-column label="总评" width="100">
-              <template #default="scope">
-                {{ calcTotal(scope.row) }}
-              </template>
-            </el-table-column>
-          </el-table>
-          <div class="form-actions">
-            <el-button type="primary" @click="handleSaveGrades">保存成绩</el-button>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="考勤管理" name="attendance">
-          <el-table :data="attendanceRows" border style="width: 100%">
-            <el-table-column prop="date" label="日期" width="140" />
-            <el-table-column prop="topic" label="授课内容" />
-            <el-table-column prop="present" label="出勤" width="100" />
-            <el-table-column prop="absent" label="缺勤" width="100" />
-            <el-table-column prop="late" label="迟到" width="100" />
-            <el-table-column label="操作" width="120">
-              <template #default>
-                <el-button link type="primary">编辑</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-
-        <el-tab-pane label="作业与资源" name="resources">
           <div class="toolbar">
-            <el-button type="primary" :icon="Plus" @click="handleCreateAssignment">发布作业</el-button>
-            <el-button :icon="Upload" @click="handleUploadResource">上传资源</el-button>
+            <el-select v-model="selectedAssessmentId" placeholder="选择考核环节" style="width: 240px" @change="fetchGrades">
+              <el-option v-for="a in assessments" :key="a.id" :label="a.name" :value="a.id" />
+            </el-select>
+            <el-button :icon="Download" @click="exportGrades">导出成绩</el-button>
           </div>
-          <el-table :data="assignments" border style="width: 100%">
-            <el-table-column prop="title" label="名称" />
-            <el-table-column prop="type" label="类型" width="120">
+          <el-table :data="gradeTableData" border style="width: 100%" v-loading="gradesLoading">
+            <el-table-column prop="studentId" label="学号" width="120" />
+            <el-table-column prop="studentName" label="姓名" width="120" />
+            <el-table-column label="成绩" width="200">
               <template #default="scope">
-                <el-tag size="small">{{ scope.row.type }}</el-tag>
+                <el-input-number v-model="scope.row.score" :min="0" :max="100" size="small" :precision="1" />
               </template>
             </el-table-column>
-            <el-table-column prop="deadline" label="截止时间" width="160" />
-            <el-table-column prop="submitCount" label="提交情况" width="120" />
+            <el-table-column label="操作" width="120">
+              <template #default="scope">
+                <el-button link type="primary" @click="saveGrade(scope.row)">保存</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+          <div v-if="!selectedAssessmentId" style="text-align: center; color: #999; padding: 40px">
+            请先选择考核环节
+          </div>
+          <div v-if="!assessments.length" style="text-align: center; color: #999; padding: 40px">
+            暂无考核环节，请在"课程目标"中先设置考核环节
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="课程目标" name="objectives">
+          <div class="toolbar">
+            <el-button type="primary" :icon="Plus" @click="openObjectiveDialog()">新增课程目标</el-button>
+          </div>
+          <el-table :data="objectives" border style="width: 100%" v-loading="objectivesLoading">
+            <el-table-column prop="code" label="编号" width="100" />
+            <el-table-column prop="description" label="课程目标描述" min-width="300" />
+            <el-table-column prop="weight" label="权重" width="100" />
             <el-table-column label="操作" width="160">
-              <template #default>
-                <el-button link type="primary">查看</el-button>
-                <el-button link type="primary">编辑</el-button>
+              <template #default="scope">
+                <el-button link type="primary" @click="openObjectiveDialog(scope.row)">编辑</el-button>
+                <el-button link type="danger" @click="deleteObjective(scope.row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="教学资源" name="resources">
+          <div class="toolbar">
+            <el-button type="primary" :icon="Upload" @click="openResourceUpload">上传资源</el-button>
+          </div>
+          <el-table :data="resources" border style="width: 100%" v-loading="resourcesLoading">
+            <el-table-column prop="fileName" label="文件名称" min-width="200" />
+            <el-table-column prop="resourceType" label="类型" width="120">
+              <template #default="scope">
+                <el-tag size="small">{{ scope.row.resourceType || '-' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="createdAt" label="上传时间" width="170" />
+            <el-table-column label="操作" width="180">
+              <template #default="scope">
+                <el-button link type="primary" @click="downloadResource(scope.row)">下载</el-button>
+                <el-button link type="danger" @click="deleteResource(scope.row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-tab-pane>
       </el-tabs>
     </el-card>
+
+    <!-- 课程目标弹窗 -->
+    <el-dialog v-model="objectiveDialogVisible" :title="objectiveDialogTitle" width="500px">
+      <el-form ref="objFormRef" :model="objForm" label-width="100px">
+        <el-form-item label="编号" required>
+          <el-input v-model="objForm.code" placeholder="如 OBJ1" />
+        </el-form-item>
+        <el-form-item label="描述" required>
+          <el-input v-model="objForm.description" type="textarea" :rows="3" placeholder="课程目标描述" />
+        </el-form-item>
+        <el-form-item label="权重">
+          <el-input-number v-model="objForm.weight" :min="0" :max="1" :step="0.05" :precision="2" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="objectiveDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitObjective" :loading="objSubmitting">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 资源上传弹窗 -->
+    <el-dialog v-model="resourceDialogVisible" title="上传教学资源" width="450px">
+      <el-upload
+        ref="uploadRef"
+        drag
+        :action="`/api/teacher/resources/upload/${offeringId}`"
+        :headers="uploadHeaders"
+        :on-success="handleUploadSuccess"
+        :on-error="handleUploadError"
+        accept=".pdf,.ppt,.pptx,.doc,.docx,.xls,.xlsx"
+      >
+        <el-icon><UploadFilled /></el-icon>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <template #tip>
+          <div class="el-upload__tip">支持 PDF/PPT/DOC/XLS 格式，最大 50MB</div>
+        </template>
+      </el-upload>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { Download, Plus, Upload } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Download, Plus, Upload, UploadFilled } from '@element-plus/icons-vue'
+import request from '@/api/request'
 
 const route = useRoute()
+const offeringId = computed(() => route.params.id)
+
+// ============ 状态 ============
 const activeTab = ref('students')
+const pageLoading = ref(false)
 const studentKeyword = ref('')
 
-const courseMap = {
-  '1': { name: '数据结构与算法', code: 'CS301', teacher: '王教授', credits: 3, className: '计算机科学与技术 2024级1班', status: '进行中' },
-  '2': { name: '操作系统', code: 'CS302', teacher: '李教授', credits: 3, className: '软件工程 2024级1班', status: '进行中' },
-  '3': { name: '数据库系统', code: 'CS303', teacher: '张教授', credits: 2, className: '数据科学 2024级1班', status: '已结束' },
-  '4': { name: '计算机网络', code: 'CS201', teacher: '赵教授', credits: 3, className: '计算机科学与技术 2023级1班', status: '已结束' },
-  '5': { name: '软件工程', code: 'CS202', teacher: '刘教授', credits: 2, className: '软件工程 2023级2班', status: '已结束' }
-}
+// ============ 课程信息 ============
+const courseInfo = ref({
+  courseName: '',
+  courseCode: '',
+  credits: '',
+  teacherName: '',
+  academicYear: '',
+  semester: ''
+})
 
-const courseInfo = computed(() => courseMap[route.params.id] || courseMap['1'])
+// ============ 学生 ============
+const studentsLoading = ref(false)
+const rawStudents = ref([])
 
-const students = ref([
-  { id: '2024001', name: '张明', major: '计算机科学与技术', class: '1班', phone: '138****1234', attendance: '96%' },
-  { id: '2024002', name: '李红', major: '计算机科学与技术', class: '1班', phone: '138****1235', attendance: '92%' },
-  { id: '2024003', name: '王强', major: '软件工程', class: '2班', phone: '138****1236', attendance: '88%' },
-  { id: '2024004', name: '赵丽', major: '数据科学', class: '1班', phone: '138****1237', attendance: '100%' }
-])
-
-const gradeRows = ref([
-  { id: '2024001', name: '张明', daily: 88, lab: 92, final: 86 },
-  { id: '2024002', name: '李红', daily: 91, lab: 89, final: 90 },
-  { id: '2024003', name: '王强', daily: 82, lab: 84, final: 78 },
-  { id: '2024004', name: '赵丽', daily: 95, lab: 93, final: 94 }
-])
-
-const attendanceRows = ref([
-  { date: '2024-09-02', topic: '课程导论', present: 42, absent: 1, late: 2 },
-  { date: '2024-09-09', topic: '线性表', present: 44, absent: 0, late: 1 },
-  { date: '2024-09-16', topic: '栈和队列', present: 43, absent: 1, late: 1 }
-])
-
-const assignments = ref([
-  { title: '线性表课后作业', type: '作业', deadline: '2024-09-20', submitCount: '40/45' },
-  { title: '实验一：顺序表实现', type: '实验', deadline: '2024-09-28', submitCount: '38/45' },
-  { title: '第一章课件', type: '资源', deadline: '-', submitCount: '-' }
-])
-
+const studentCount = computed(() => rawStudents.value.length)
 const filteredStudents = computed(() => {
-  const keyword = studentKeyword.value.trim()
-  if (!keyword) return students.value
-  return students.value.filter(item => item.id.includes(keyword) || item.name.includes(keyword))
+  const kw = studentKeyword.value.trim()
+  if (!kw) return rawStudents.value
+  return rawStudents.value.filter(s =>
+    String(s.studentId).includes(kw) || (s.studentName && s.studentName.includes(kw))
+  )
 })
 
-const averageScore = computed(() => {
-  const total = gradeRows.value.reduce((sum, item) => sum + Number(calcTotal(item)), 0)
-  return (total / gradeRows.value.length).toFixed(1)
+// ============ 成绩 ============
+const gradesLoading = ref(false)
+const assessments = ref([])
+const selectedAssessmentId = ref(null)
+const gradeTableData = ref([])
+
+const assessmentCount = computed(() => assessments.value.length)
+
+// ============ 课程目标 ============
+const objectives = ref([])
+const objectivesLoading = ref(false)
+const objectiveDialogVisible = ref(false)
+const objFormRef = ref(null)
+const objSubmitting = ref(false)
+const editingObjectiveId = ref(null)
+const objForm = ref({ code: '', description: '', weight: 0.5 })
+
+const objectiveCount = computed(() => objectives.value.length)
+const objectiveDialogTitle = computed(() => editingObjectiveId.value ? '编辑课程目标' : '新增课程目标')
+
+// ============ 资源 ============
+const resources = ref([])
+const resourcesLoading = ref(false)
+const resourceDialogVisible = ref(false)
+const uploadRef = ref(null)
+
+const resourceCount = computed(() => resources.value.length)
+
+const uploadHeaders = computed(() => ({
+  Authorization: `Bearer ${localStorage.getItem('token')}`
+}))
+
+// ============ 加载课程信息 ============
+const fetchCourseInfo = async () => {
+  pageLoading.value = true
+  try {
+    const res = await request.get(`/teacher/offering/detail/${offeringId.value}`)
+    if (res.status === 'success' && res.data) {
+      courseInfo.value = res.data
+    }
+  } catch (e) {
+    // 拦截器已处理
+  } finally {
+    pageLoading.value = false
+  }
+}
+
+// ============ 加载学生（通过成绩 API） ============
+const fetchStudents = async () => {
+  studentsLoading.value = true
+  try {
+    const res = await request.get('/teacher/grades/list', {
+      params: { offeringId: offeringId.value, pageSize: 999 }
+    })
+    if (res.status === 'success' && res.data && res.data.list) {
+      // 按 studentId 分组
+      const studentMap = new Map()
+      res.data.list.forEach(g => {
+        if (!studentMap.has(g.studentId)) {
+          studentMap.set(g.studentId, {
+            studentId: g.studentId,
+            studentName: g.studentName,
+            grades: []
+          })
+        }
+        studentMap.get(g.studentId).grades.push({
+          assessmentId: g.assessmentId,
+          assessmentName: g.assessmentName,
+          score: g.score,
+          gradeId: g.id
+        })
+      })
+      rawStudents.value = Array.from(studentMap.values())
+    }
+  } catch (e) {
+    rawStudents.value = []
+  } finally {
+    studentsLoading.value = false
+  }
+}
+
+// ============ 考核环节 ============
+const fetchAssessments = async () => {
+  try {
+    const res = await request.get(`/teacher/assessments/offering/${offeringId.value}`)
+    if (res.status === 'success' && res.data) {
+      assessments.value = res.data
+    }
+  } catch (e) {
+    assessments.value = []
+  }
+}
+
+// ============ 成绩管理 ============
+const fetchGrades = async () => {
+  if (!selectedAssessmentId.value) return
+  gradesLoading.value = true
+  try {
+    const res = await request.get('/teacher/grades/list', {
+      params: { offeringId: offeringId.value, pageSize: 999 }
+    })
+    if (res.status === 'success' && res.data && res.data.list) {
+      // 筛选当前考核环节的成绩
+      const filtered = res.data.list.filter(g => g.assessmentId === selectedAssessmentId.value)
+      gradeTableData.value = filtered.map(g => ({
+        id: g.id,
+        studentId: g.studentId,
+        studentName: g.studentName,
+        score: g.score,
+        assessmentId: g.assessmentId
+      }))
+    }
+  } catch (e) {
+    gradeTableData.value = []
+  } finally {
+    gradesLoading.value = false
+  }
+}
+
+const saveGrade = async (row) => {
+  try {
+    await request.post('/teacher/grades/save', {
+      id: row.id,
+      assessmentId: row.assessmentId || selectedAssessmentId.value,
+      studentId: row.studentId,
+      score: row.score
+    })
+    ElMessage.success('成绩已保存')
+  } catch (e) {
+    // 已提示
+  }
+}
+
+const exportGrades = () => {
+  ElMessage.info('导出成绩功能待实现')
+}
+
+// ============ 课程目标 ============
+const fetchObjectives = async () => {
+  objectivesLoading.value = true
+  try {
+    const res = await request.get(`/teacher/offering/${offeringId.value}/objectives`)
+    if (res.status === 'success' && res.data) {
+      objectives.value = res.data
+    }
+  } catch (e) {
+    objectives.value = []
+  } finally {
+    objectivesLoading.value = false
+  }
+}
+
+const openObjectiveDialog = (row) => {
+  if (row) {
+    editingObjectiveId.value = row.id
+    objForm.value = { code: row.code || '', description: row.description || '', weight: row.weight || 0.5 }
+  } else {
+    editingObjectiveId.value = null
+    objForm.value = { code: '', description: '', weight: 0.5 }
+  }
+  objectiveDialogVisible.value = true
+}
+
+const submitObjective = async () => {
+  objSubmitting.value = true
+  try {
+    const body = { ...objForm.value }
+    if (editingObjectiveId.value) {
+      await request.put(`/teacher/objectives/${editingObjectiveId.value}`, body)
+      ElMessage.success('课程目标已更新')
+    } else {
+      await request.post(`/teacher/offering/${offeringId.value}/objectives`, body)
+      ElMessage.success('课程目标已添加')
+    }
+    objectiveDialogVisible.value = false
+    fetchObjectives()
+  } catch (e) {
+    // 已提示
+  } finally {
+    objSubmitting.value = false
+  }
+}
+
+const deleteObjective = (row) => {
+  ElMessageBox.confirm(`确定删除课程目标 "${row.code}" 吗？`, '确认', {
+    type: 'warning',
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
+  }).then(async () => {
+    try {
+      await request.delete(`/teacher/objectives/${row.id}`)
+      ElMessage.success('已删除')
+      fetchObjectives()
+    } catch (e) {
+      // 已提示
+    }
+  }).catch(() => {})
+}
+
+// ============ 资源 ============
+const fetchResources = async () => {
+  resourcesLoading.value = true
+  try {
+    const res = await request.get(`/teacher/resources/offering/${offeringId.value}`)
+    if (res.status === 'success' && res.data) {
+      resources.value = res.data
+    }
+  } catch (e) {
+    resources.value = []
+  } finally {
+    resourcesLoading.value = false
+  }
+}
+
+const openResourceUpload = () => {
+  resourceDialogVisible.value = true
+}
+
+const handleUploadSuccess = (response) => {
+  if (response.status === 'success') {
+    ElMessage.success('上传成功')
+    resourceDialogVisible.value = false
+    fetchResources()
+  } else {
+    ElMessage.error(response.message || '上传失败')
+  }
+}
+
+const handleUploadError = () => {
+  ElMessage.error('上传失败')
+}
+
+const downloadResource = (row) => {
+  const token = localStorage.getItem('token')
+  const url = `/api/teacher/resources/download/${row.id}`
+  const link = document.createElement('a')
+  link.href = url
+  // Use fetch for auth
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => res.blob())
+    .then(blob => {
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = row.fileName || 'download'
+      a.click()
+      window.URL.revokeObjectURL(blobUrl)
+    })
+    .catch(() => ElMessage.error('下载失败'))
+}
+
+const deleteResource = (row) => {
+  ElMessageBox.confirm(`确定删除资源 "${row.fileName}" 吗？`, '确认', {
+    type: 'warning',
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
+  }).then(async () => {
+    try {
+      await request.delete(`/teacher/resources/${row.id}`)
+      ElMessage.success('已删除')
+      fetchResources()
+    } catch (e) {
+      // 已提示
+    }
+  }).catch(() => {})
+}
+
+// ============ Tab 切换 ============
+const handleTabChange = (tab) => {
+  switch (tab) {
+    case 'students': fetchStudents(); break
+    case 'grades': fetchAssessments(); break
+    case 'objectives': fetchObjectives(); break
+    case 'resources': fetchResources(); break
+  }
+}
+
+// ============ 初始化 ============
+onMounted(() => {
+  fetchCourseInfo()
+  fetchStudents()
 })
-
-const attendanceRate = computed(() => {
-  const totalPresent = attendanceRows.value.reduce((sum, item) => sum + item.present, 0)
-  const total = attendanceRows.value.reduce((sum, item) => sum + item.present + item.absent + item.late, 0)
-  return Math.round((totalPresent / total) * 100)
-})
-
-const calcTotal = (row) => {
-  return (row.daily * 0.3 + row.lab * 0.3 + row.final * 0.4).toFixed(1)
-}
-
-const getStatusType = (status) => {
-  const map = { '进行中': 'primary', '已结束': 'info', '未开始': 'warning' }
-  return map[status] || 'info'
-}
-
-const handleExportStudents = () => {
-  ElMessage.success('学生名单已导出')
-}
-
-const handleSaveGrades = () => {
-  ElMessage.success('成绩保存成功')
-}
-
-const handleCreateAssignment = () => {
-  ElMessage.info('打开作业发布窗口')
-}
-
-const handleUploadResource = () => {
-  ElMessage.info('打开资源上传窗口')
-}
 </script>
 
 <style scoped>
@@ -276,11 +546,5 @@ const handleUploadResource = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-}
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 16px;
 }
 </style>

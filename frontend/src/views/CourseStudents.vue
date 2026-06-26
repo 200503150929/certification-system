@@ -1,5 +1,5 @@
 <template>
-  <div class="course-students-container">
+  <div class="course-students-container" v-loading="loading">
     <el-card>
       <template #header>
         <div class="card-header">
@@ -14,34 +14,28 @@
         </div>
       </template>
 
-      <!-- 搜索 -->
       <div class="search-bar">
-        <el-input
-          v-model="keyword"
-          placeholder="搜索姓名/学号"
-          prefix-icon="Search"
-          style="width: 300px"
-        />
+        <el-input v-model="keyword" placeholder="搜索姓名/学号" style="width: 300px" clearable />
       </div>
 
-      <!-- 学生列表 -->
       <el-table :data="filteredStudents" border style="width: 100%">
-        <el-table-column prop="id" label="学号" width="120" />
-        <el-table-column prop="name" label="姓名" width="120" />
-        <el-table-column prop="major" label="专业" />
-        <el-table-column prop="grade" label="年级" width="100" />
-        <el-table-column prop="class" label="班级" width="100" />
-        <el-table-column prop="phone" label="联系方式" width="150" />
-        <el-table-column label="操作" width="120" fixed="right">
+        <el-table-column prop="studentId" label="学号" width="120" />
+        <el-table-column prop="studentName" label="姓名" width="120" />
+        <el-table-column label="成绩概况" min-width="250">
           <template #default="scope">
-            <el-button link type="primary" @click="viewStudent(scope.row)">
-              查看
-            </el-button>
+            <el-tag
+              v-for="g in scope.row.grades"
+              :key="g.assessmentId"
+              size="small"
+              style="margin-right: 4px; margin-bottom: 2px"
+            >
+              {{ g.assessmentName }}: {{ g.score }}
+            </el-tag>
+            <span v-if="!scope.row.grades || scope.row.grades.length === 0" style="color: #999">未录入</span>
           </template>
         </el-table-column>
       </el-table>
 
-      <!-- 分页 -->
       <div class="pagination">
         <el-pagination
           background
@@ -55,52 +49,78 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
-import { useRoute } from 'vue-router';
-import { ElMessage } from 'element-plus';
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import request from '@/api/request'
 
-const route = useRoute();
-const courseId = route.params.id;
-const courseName = ref('数据结构与算法');
-const keyword = ref('');
+const route = useRoute()
+const offeringId = route.params.id
 
-const students = ref([
-  { id: '2024001', name: '张明', major: '计算机科学与技术', grade: '2024级', class: '1班', phone: '138****1234' },
-  { id: '2024002', name: '李红', major: '计算机科学与技术', grade: '2024级', class: '1班', phone: '138****1235' },
-  { id: '2024003', name: '王强', major: '软件工程', grade: '2024级', class: '2班', phone: '138****1236' },
-  { id: '2024004', name: '赵丽', major: '数据科学', grade: '2024级', class: '1班', phone: '138****1237' },
-]);
+const loading = ref(false)
+const courseName = ref('加载中...')
+const keyword = ref('')
+const students = ref([])
 
 const filteredStudents = computed(() => {
-  if (!keyword.value) return students.value;
-  const k = keyword.value.toLowerCase();
+  if (!keyword.value) return students.value
+  const k = keyword.value.toLowerCase()
   return students.value.filter(s =>
-    s.name.includes(k) || s.id.includes(k)
-  );
-});
+    String(s.studentId).includes(k) || (s.studentName && s.studentName.includes(k))
+  )
+})
 
-const viewStudent = (student) => {
-  ElMessage.info(`查看学生：${student.name}`);
-  // 跳转到学生详情或弹出对话框
-};
+const loadData = async () => {
+  loading.value = true
+  try {
+    // 加载开课信息
+    const offeringRes = await request.get(`/teacher/offering/detail/${offeringId}`)
+    if (offeringRes.status === 'success' && offeringRes.data) {
+      courseName.value = offeringRes.data.courseName || '未知课程'
+    }
+
+    // 加载成绩（含学生信息）
+    const gradesRes = await request.get('/teacher/grades/list', {
+      params: { offeringId, pageSize: 999 }
+    })
+    if (gradesRes.status === 'success' && gradesRes.data && gradesRes.data.list) {
+      const studentMap = new Map()
+      gradesRes.data.list.forEach(g => {
+        if (!studentMap.has(g.studentId)) {
+          studentMap.set(g.studentId, {
+            studentId: g.studentId,
+            studentName: g.studentName,
+            grades: []
+          })
+        }
+        studentMap.get(g.studentId).grades.push({
+          assessmentId: g.assessmentId,
+          assessmentName: g.assessmentName,
+          score: g.score
+        })
+      })
+      students.value = Array.from(studentMap.values())
+    }
+  } catch (e) {
+    students.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadData()
+})
 </script>
 
 <style scoped>
-.course-students-container {
-  padding: 20px;
-}
+.course-students-container { padding: 20px; }
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
-.student-count {
-  color: #666;
-  font-size: 14px;
-}
-.search-bar {
-  margin-bottom: 16px;
-}
+.student-count { color: #666; font-size: 14px; }
+.search-bar { margin-bottom: 16px; }
 .pagination {
   display: flex;
   justify-content: flex-end;

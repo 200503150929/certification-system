@@ -11,27 +11,29 @@
             <div class="page-subtitle">{{ programName }}</div>
           </div>
           <div class="header-right">
-            <el-button :icon="Download" @click="handleExport">导出矩阵</el-button>
-            <el-button type="primary" @click="handleSave">保存矩阵</el-button>
+            <el-button type="primary" @click="handleSaveAll" :loading="saving">保存矩阵</el-button>
           </div>
         </div>
       </template>
 
-      <div class="matrix-container">
-        <el-table :data="matrixData" border style="width: 100%">
-          <el-table-column prop="goal" label="培养目标 / 毕业要求" width="200" fixed />
+      <div class="matrix-container" v-loading="loading">
+        <el-table v-if="requirements.length > 0" :data="matrixData" border style="width: 100%">
+          <el-table-column prop="description" label="培养目标 / 毕业要求" width="240" fixed>
+            <template #default="scope">
+              <span class="objective-label">{{ scope.row.description }}</span>
+            </template>
+          </el-table-column>
           <el-table-column
-            v-for="req in requirementList"
+            v-for="req in requirements"
             :key="req.id"
             :label="req.code"
-            width="100"
+            width="110"
           >
             <template #default="scope">
               <el-select
-                v-model="scope.row[req.id]"
+                v-model="scope.row.supportMap[req.id]"
                 placeholder="无"
                 size="small"
-                @change="handleMatrixChange(scope.row, req.id)"
               >
                 <el-option label="强支撑" value="强" />
                 <el-option label="弱支撑" value="弱" />
@@ -41,7 +43,9 @@
           </el-table-column>
         </el-table>
 
-        <div class="matrix-legend">
+        <el-empty v-if="!loading && (objectives.length === 0 || requirements.length === 0)" description="请先配置培养目标和毕业要求" />
+
+        <div class="matrix-legend" v-if="requirements.length > 0">
           <span class="legend-title">支撑强度图例：</span>
           <span class="legend-item strong">■ 强支撑</span>
           <span class="legend-item weak">■ 弱支撑</span>
@@ -53,75 +57,121 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import request from '@/api/request'
 
-const programName = ref('计算机科学与技术')
+const route = useRoute()
+const programId = ref(route.query.programId || '')
+const programName = ref('')
 
-const requirementList = ref([
-  { id: 'req1', code: '1' },
-  { id: 'req2', code: '2' },
-  { id: 'req3', code: '3' },
-  { id: 'req4', code: '4' },
-  { id: 'req5', code: '5' },
-  { id: 'req6', code: '6' },
-  { id: 'req7', code: '7' },
-  { id: 'req8', code: '8' },
-])
+const objectives = ref([])
+const requirements = ref([])
+const matrixData = ref([])
+const loading = ref(false)
+const saving = ref(false)
 
-const matrixData = ref([
-  {
-    id: '1',
-    goal: '目标1：掌握扎实的专业知识',
-    req1: '强',
-    req2: '强',
-    req3: '强',
-    req4: '弱',
-    req5: '',
-    req6: '',
-    req7: '',
-    req8: ''
-  },
-  {
-    id: '2',
-    goal: '目标2：具备工程实践与创新能力',
-    req1: '弱',
-    req2: '强',
-    req3: '强',
-    req4: '强',
-    req5: '弱',
-    req6: '',
-    req7: '',
-    req8: ''
-  },
-  {
-    id: '3',
-    goal: '目标3：具有团队协作与国际视野',
-    req1: '',
-    req2: '',
-    req3: '弱',
-    req4: '',
-    req5: '',
-    req6: '强',
-    req7: '强',
-    req8: '弱'
-  },
-])
-
-const handleMatrixChange = (row, reqId) => {
-  console.log('Matrix changed:', row.goal, reqId, row[reqId])
+// 加载专业信息
+const loadProgramInfo = async () => {
+  if (!programId.value) return
+  try {
+    const res = await request.get(`/admin/program/get/${programId.value}`)
+    if (res.data) {
+      programName.value = res.data.majorName || ''
+    }
+  } catch {
+    // ignore
+  }
 }
 
-const handleSave = () => {
-  ElMessage.success('矩阵保存成功')
+// 加载所有数据
+const loadData = async () => {
+  if (!programId.value) return
+  loading.value = true
+  try {
+    // 并行加载目标和毕业要求
+    const [objRes, reqRes] = await Promise.all([
+      request.get(`/admin/program/objectives/list/${programId.value}`),
+      request.get(`/admin/program/requirements/list/${programId.value}`)
+    ])
+    objectives.value = objRes.data || []
+    requirements.value = reqRes.data || []
+
+    // 为每个目标加载其支撑矩阵
+    const matrixPromises = objectives.value.map(obj =>
+      request.get(`/admin/program/matrix/list/${obj.id}`).then(res => ({
+        objectiveId: obj.id,
+        items: res.data || []
+      })).catch(() => ({ objectiveId: obj.id, items: [] }))
+    )
+    const matrixResults = await Promise.all(matrixPromises)
+
+    // 构建矩阵数据
+    const matrixMap = {}
+    for (const result of matrixResults) {
+      matrixMap[result.objectiveId] = result.items
+    }
+
+    matrixData.value = objectives.value.map(obj => {
+      const row = {
+        id: obj.id,
+        description: obj.description,
+        supportMap: reactive({})
+      }
+      // 初始化所有要求为无支撑
+      for (const req of requirements.value) {
+        row.supportMap[req.id] = ''
+      }
+      // 填充已有的支撑关系
+      const existingItems = matrixMap[obj.id] || []
+      for (const item of existingItems) {
+        row.supportMap[item.requirementId] = item.supportLevel || ''
+      }
+      return row
+    })
+  } catch (e) {
+    ElMessage.error(e.message || '加载矩阵数据失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const handleExport = () => {
-  ElMessage.success('矩阵导出成功')
+// 保存所有目标的矩阵
+const handleSaveAll = async () => {
+  saving.value = true
+  try {
+    let savedCount = 0
+    for (const row of matrixData.value) {
+      const items = []
+      for (const req of requirements.value) {
+        const supportLevel = row.supportMap[req.id]
+        if (supportLevel) {
+          items.push({
+            requirementId: req.id,
+            supportLevel: supportLevel
+          })
+        }
+      }
+      // 即使 items 为空也保存（清空支撑关系）
+      await request.post('/admin/program/matrix/batch-save', {
+        objectiveId: row.id,
+        items: items
+      })
+      savedCount++
+    }
+    ElMessage.success(`矩阵保存成功（已保存 ${savedCount} 个培养目标的支撑关系）`)
+  } catch (e) {
+    ElMessage.error(e.message || '矩阵保存失败')
+  } finally {
+    saving.value = false
+  }
 }
 
-onMounted(() => {})
+onMounted(() => {
+  loadProgramInfo()
+  loadData()
+})
 </script>
 
 <style scoped>
@@ -155,6 +205,12 @@ onMounted(() => {})
 }
 
 .matrix-container { margin-top: 16px; overflow-x: auto; }
+
+.objective-label {
+  font-weight: 500;
+  color: #333;
+}
+
 .matrix-legend {
   margin-top: 16px;
   padding: 12px 20px;
