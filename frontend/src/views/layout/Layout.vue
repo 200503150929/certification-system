@@ -123,10 +123,6 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item v-if="userRole !== 'admin'" command="profile">
-                  <el-icon><User /></el-icon>
-                  个人中心
-                </el-dropdown-item>
                 <el-dropdown-item command="logout" divided>
                   <el-icon style="color: #f56c6c"><SwitchButton /></el-icon>
                   <span style="color: #f56c6c">退出登录</span>
@@ -148,6 +144,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import {
   School,
   Monitor,
@@ -160,15 +157,13 @@ import {
   DocumentCopy,
   Expand,
   Fold,
-  QuestionFilled,
-  ChatDotRound,
-  InfoFilled,
   SwitchButton
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 // ============ 状态 ============
 const isCollapse = ref(false)
@@ -176,8 +171,8 @@ const notificationCount = ref(3)
 
 // ============ 用户信息 ============
 const userInfo = ref({
-  name: '张明',
-  role: 'student' // 可选: 'student' | 'teacher' | 'admin'
+  name: '',
+  role: '' // 可选: 'student' | 'teacher' | 'admin'
 })
 
 const userRole = computed(() => userInfo.value.role)
@@ -234,20 +229,6 @@ const toggleCollapse = () => {
 // 下拉菜单命令处理
 const handleCommand = (command) => {
   switch (command) {
-    case 'profile':
-      if (userRole.value !== 'admin') {
-        router.push('/profile')
-      }
-      break
-    case 'help':
-      ElMessage.info('打开使用指南')
-      break
-    case 'feedback':
-      ElMessage.info('打开意见反馈')
-      break
-    case 'about':
-      ElMessage.info('关于系统')
-      break
     case 'logout':
       handleLogout()
       break
@@ -267,17 +248,9 @@ const handleLogout = () => {
       type: 'warning'
     }
   ).then(() => {
-    // 清除本地存储
-    localStorage.removeItem('token')
-    localStorage.removeItem('userRole')
-    localStorage.removeItem('username')
-    localStorage.removeItem('rememberMe')
-    localStorage.removeItem('savedUsername')
-
+    // 调用 authStore.logout() 统一清除 state + localStorage + 跳转登录页
+    authStore.logout()
     ElMessage.success('已安全退出')
-
-    // 跳转到登录页
-    router.push('/login')
   }).catch(() => {
     // 用户取消退出
   })
@@ -285,8 +258,8 @@ const handleLogout = () => {
 
 // ============ 加载用户信息 ============
 const loadUserInfo = () => {
-  const role = localStorage.getItem('userRole') || 'student'
-  const name = localStorage.getItem('username') || '张明'
+  const role = localStorage.getItem('userRole') || ''
+  const name = localStorage.getItem('displayName') || ''
 
   userInfo.value.role = role
   userInfo.value.name = name

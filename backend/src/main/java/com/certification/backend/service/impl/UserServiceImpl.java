@@ -105,7 +105,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse updateUser(UserRequest request) {
         User user = userRepository.findById(request.getId())
-                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum. USER_NOT_FOUND));
 
         // 如果修改了用户名，检查是否与其他用户冲突
         if (!user.getUsername().equals(request.getUsername())

@@ -10,11 +10,13 @@ import com.certification.backend.security.JwtUtil;
 import com.certification.backend.service.AuthService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 认证服务实现类
  */
 @Service
+@Transactional(readOnly = true)
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;

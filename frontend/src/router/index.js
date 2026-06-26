@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 import Login from '../views/Login.vue'
 import Layout from '../views/layout/Layout.vue'
 import Dashboard from '../views/Dashboard.vue'
@@ -39,11 +40,11 @@ const router = createRouter({
       path: '/',
       component: Layout,
       redirect: () => {
-        const token = localStorage.getItem('token');
-        // 如果没登录，直接去登录页，别去尝试触发子路由的守卫！
-        if (!token) return '/login';
+        const authStore = useAuthStore();
+        // 如果没登录，直接去登录页
+        if (!authStore.isLoggedIn) return '/login';
         // 如果登录了，再根据角色跳转
-        return getUserRole() === 'student' ? '/my-courses' : '/dashboard';
+        return authStore.getHomePath();
       },
       meta: { requiresAuth: true },
       children: [
@@ -249,16 +250,6 @@ const router = createRouter({
 })
 
 // ============ 路由守卫 ============
-// 获取用户角色（从 localStorage 获取，后端返回英文角色名）
-const getUserRole = () => {
-  return localStorage.getItem('userRole') || 'student'
-}
-
-const getHomePath = (userRole) => {
-  // userRole 是英文: admin, teacher, student
-  if (userRole === 'student') return '/my-courses'
-  return '/dashboard'
-}
 
 // 检查是否有权限访问
 const hasPermission = (routeRoles, userRole) => {
@@ -266,26 +257,24 @@ const hasPermission = (routeRoles, userRole) => {
   return routeRoles.includes(userRole)
 }
 
-router.beforeEach((to, from) => { // 【修改点1】：删除 next 参数
-                                  // 获取 token
-  const token = localStorage.getItem('token')
-  const userRole = getUserRole()
+router.beforeEach((to, from) => {
+  const authStore = useAuthStore()
 
   // 1. 如果访问的是登录页
   if (to.path === '/login') {
-    if (token) {
+    if (authStore.isLoggedIn) {
       // 已登录，跳转到首页
-      return getHomePath(userRole) // 【修改点2】：return 路径字符串
+      return authStore.getHomePath()
     } else {
-      return true // 【修改点3】：return true 表示放行
+      return true
     }
   }
 
   // 2. 检查是否需要登录
   if (to.meta.requiresAuth !== false) {
-    if (!token) {
+    if (!authStore.isLoggedIn) {
       // 未登录，跳转到登录页
-      return { // 【修改点4】：return 一个包含 path 和 query 的对象
+      return {
         path: '/login',
         query: { redirect: to.fullPath }
       }
@@ -293,15 +282,15 @@ router.beforeEach((to, from) => { // 【修改点1】：删除 next 参数
 
     // 3. 检查角色权限
     const routeRoles = to.meta.roles
-    if (routeRoles && !hasPermission(routeRoles, userRole)) {
+    if (routeRoles && !hasPermission(routeRoles, authStore.userRole)) {
       // 无权限，跳转到首页
       console.warn('您没有权限访问该页面')
-      return getHomePath(userRole) // 【修改点5】：return 路径字符串
+      return authStore.getHomePath()
     }
   }
 
   // 最后，如果所有检查都通过，直接放行
-  return true // 【修改点6】：结尾统一 return true
+  return true
 })
 
 export default router
