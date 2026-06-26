@@ -13,6 +13,9 @@ import java.math.BigDecimal;
 @Getter
 public class GradeRequest {
 
+    /** 成绩ID，有值则更新，无值则新增 */
+    private Long id;
+
     @NotNull(message = "开课ID不能为空")
     private Long offeringId;
 

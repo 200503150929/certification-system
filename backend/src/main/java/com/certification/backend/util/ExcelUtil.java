@@ -1,6 +1,8 @@
 package com.certification.backend.util;
 
 import com.certification.backend.entity.User;
+import com.alibaba.excel.annotation.ExcelProperty;
+import com.alibaba.excel.annotation.write.style.ColumnWidth;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -9,19 +11,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Excel 导入工具类（基于 EasyExcel）
+ * Excel 工具类（基于 EasyExcel）
  *
- * 支持两类 Excel 解析：
+ * 支持功能：
  * 1. 用户批量导入：用户名、姓名、角色、电话、邮箱、院系
  * 2. 成绩批量导入：学号、分数
+ * 3. 成绩导出到 Excel：学号、姓名、考核环节、分数
  */
 public class ExcelUtil {
 
@@ -177,6 +183,57 @@ public class ExcelUtil {
 
         log.info("Excel 成绩导入解析完成，共解析 {} 条有效记录", result.size());
         return result;
+    }
+
+    // ==================== 成绩导出 ====================
+
+    /**
+     * 成绩导出行数据，EasyExcel 写入时使用注解定义列顺序和表头
+     */
+    @Getter
+    @Setter
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class GradeExportRow {
+
+        @ExcelProperty("学号")
+        @ColumnWidth(20)
+        private String studentNo;
+
+        @ExcelProperty("姓名")
+        @ColumnWidth(15)
+        private String studentName;
+
+        @ExcelProperty("考核环节")
+        @ColumnWidth(20)
+        private String assessmentName;
+
+        @ExcelProperty("分数")
+        @ColumnWidth(12)
+        private String score;
+    }
+
+    /**
+     * 将成绩数据写入 Excel 并通过 HttpServletResponse 输出为文件下载
+     *
+     * @param rows       成绩数据列表
+     * @param response   HTTP 响应对象
+     * @param fileName   文件名（不含后缀，自动添加 .xlsx）
+     */
+    public static void writeGradesToExcel(List<GradeExportRow> rows,
+                                          HttpServletResponse response,
+                                          String fileName) throws IOException {
+        // 设置响应头
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setCharacterEncoding("UTF-8");
+        String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
+                .replaceAll("\\+", "%20");
+        response.setHeader("Content-Disposition", "attachment;filename=" + encodedFileName + ".xlsx");
+
+        // 使用 EasyExcel 写入数据
+        com.alibaba.excel.EasyExcel.write(response.getOutputStream(), GradeExportRow.class)
+                .sheet("成绩表")
+                .doWrite(rows);
     }
 
     // ==================== 私有方法 ====================

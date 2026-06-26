@@ -11,6 +11,10 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
+  servlet:
+    multipart:
+      max-file-size: 50MB          # 单个文件最大 50MB
+      max-request-size: 60MB       # 单次请求最大 60MB（含所有文件）
 
 server:
   port: 8081

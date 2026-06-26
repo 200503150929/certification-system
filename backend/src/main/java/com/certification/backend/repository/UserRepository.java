@@ -19,4 +19,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
      * 判断用户名是否已存在
      */
     boolean existsByUsername(String username);
+
+    /**
+     * 根据姓名模糊查询用户列表
+     */
+    java.util.List<User> findByNameContaining(String name);
 }
