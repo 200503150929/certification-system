@@ -15,3 +15,14 @@ import request from './request'
 export function login(username, password) {
   return request.post('/auth/login', { username, password })
 }
+
+/**
+ * 修改密码
+ * POST /api/auth/change-password
+ *
+ * @param {Object} params - { oldPassword, newPassword, confirmPassword }
+ * @returns {Promise<Object>} ResponseVO
+ */
+export function changePassword({ oldPassword, newPassword, confirmPassword }) {
+  return request.post('/auth/changePassword', { oldPassword, newPassword, confirmPassword })
+}

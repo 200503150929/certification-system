@@ -9,10 +9,16 @@ import com.certification.backend.dto.response.LoginResponse;
 public interface AuthService {
 
     /**
-     * 用户登录，校验密码并生成 JWT Token
-     *
-     * @param request 登录请求（用户名、密码）
-     * @return 登录响应（Token + 用户基本信息）
+     * 用户登录
      */
     LoginResponse login(LoginRequest request);
+
+    /**
+     * 修改密码
+     *
+     * @param username   当前用户名（从 Token 解析）
+     * @param oldPassword 原密码
+     * @param newPassword 新密码
+     */
+    void changePassword(String username, String oldPassword, String newPassword);
 }

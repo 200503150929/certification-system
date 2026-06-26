@@ -123,6 +123,10 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
+                <el-dropdown-item command="changePassword">
+                  <el-icon><Lock /></el-icon>
+                  修改密码
+                </el-dropdown-item>
                 <el-dropdown-item command="logout" divided>
                   <el-icon style="color: #f56c6c"><SwitchButton /></el-icon>
                   <span style="color: #f56c6c">退出登录</span>
@@ -157,6 +161,7 @@ import {
   DocumentCopy,
   Expand,
   Fold,
+  Lock,
   SwitchButton
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -229,6 +234,9 @@ const toggleCollapse = () => {
 // 下拉菜单命令处理
 const handleCommand = (command) => {
   switch (command) {
+    case 'changePassword':
+      router.push('/changePassword')
+      break
     case 'logout':
       handleLogout()
       break

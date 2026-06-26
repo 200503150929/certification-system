@@ -54,4 +54,26 @@ public class AuthServiceImpl implements AuthService {
         return new LoginResponse(token, user.getId(), user.getUsername(),
                 user.getName(), user.getRole());
     }
+
+    @Override
+    @Transactional(readOnly = false)
+    public void changePassword(String username, String oldPassword, String newPassword) {
+        // 1. 查询用户
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
+
+        // 2. 校验原密码
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BusinessException(ResultCodeEnum.OLD_PASSWORD_ERROR);
+        }
+
+        // 3. 新密码不能与原密码相同
+        if (passwordEncoder.matches(newPassword, user.getPassword())) {
+            throw new BusinessException(ResultCodeEnum.PASSWORD_RESET_FAILED, "新密码不能与旧密码相同");
+        }
+
+        // 4. 更新密码
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+    }
 }

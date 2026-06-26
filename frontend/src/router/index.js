@@ -13,6 +13,7 @@ import MyCourses from '../views/MyCourses.vue'
 import CourseDetail from '../views/CourseDetail.vue'
 import CourseStudents from '../views/CourseStudents.vue'
 import TeacherCourseManage from '../views/TeacherCourseManage.vue'
+import ChangePassword from '../views/ChangePassword.vue'
 
 // ============ 模块二：人才培养方案管理 ============
 import CurriculumManagement from '../views/curriculum/CurriculumManagement.vue'
@@ -57,6 +58,17 @@ const router = createRouter({
             title: '数据看板',
             icon: 'Monitor',
             roles: ['admin', 'teacher']
+          }
+        },
+
+        // ----- 修改密码（所有角色） -----
+        {
+          path: 'changePassword',
+          name: 'ChangePassword',
+          component: ChangePassword,
+          meta: {
+            title: '修改密码',
+            icon: 'Lock'
           }
         },
 
