@@ -39,7 +39,7 @@
         <el-sub-menu v-else index="course-management">
           <template #title>
             <el-icon><Document /></el-icon>
-            <span>专业管理</span>
+            <span>课程体系管理</span>
           </template>
           <el-menu-item
             v-for="program in courseProgramList"
@@ -127,18 +127,6 @@
                   <el-icon><User /></el-icon>
                   个人中心
                 </el-dropdown-item>
-                <el-dropdown-item command="help">
-                  <el-icon><QuestionFilled /></el-icon>
-                  使用指南
-                </el-dropdown-item>
-                <el-dropdown-item command="feedback">
-                  <el-icon><ChatDotRound /></el-icon>
-                  意见反馈
-                </el-dropdown-item>
-                <el-dropdown-item command="about">
-                  <el-icon><InfoFilled /></el-icon>
-                  关于系统
-                </el-dropdown-item>
                 <el-dropdown-item command="logout" divided>
                   <el-icon style="color: #f56c6c"><SwitchButton /></el-icon>
                   <span style="color: #f56c6c">退出登录</span>
@@ -204,26 +192,26 @@ const courseProgramList = [
 // ============ 面包屑 ============
 const breadcrumbParent = computed(() => {
   const path = route.path
-  
+
   // 模块二：人才培养方案
   if (path.startsWith('/curriculum/management')) return '人才培养方案'
   if (path.startsWith('/curriculum/goals')) return '人才培养方案'
   if (path.startsWith('/curriculum/requirements')) return '人才培养方案'
   if (path.startsWith('/curriculum/indicators')) return '人才培养方案'
   if (path.startsWith('/curriculum/matrix')) return '人才培养方案'
-  
+
   // 模块七：个人信息与课程
   if (path.startsWith('/profile')) return '个人中心'
-  if (path.startsWith('/courses/program')) return '课程管理'
+  if (path.startsWith('/courses/program')) return '课程体系管理'
   if (path.startsWith('/my-courses')) return userRole.value === 'student' ? '课程学习' : '课程管理'
   if (path.startsWith('/teacher/course')) return '课程管理'
   if (path.startsWith('/course')) return userRole.value === 'student' ? '课程学习' : '课程管理'
-  
+
   // 系统管理
   if (path.startsWith('/users')) return '系统管理'
   if (path.startsWith('/roles')) return '系统管理'
   if (path.startsWith('/settings')) return '系统设置'
-  
+
   return ''
 })
 
@@ -285,9 +273,9 @@ const handleLogout = () => {
     localStorage.removeItem('username')
     localStorage.removeItem('rememberMe')
     localStorage.removeItem('savedUsername')
-    
+
     ElMessage.success('已安全退出')
-    
+
     // 跳转到登录页
     router.push('/login')
   }).catch(() => {
@@ -299,7 +287,7 @@ const handleLogout = () => {
 const loadUserInfo = () => {
   const role = localStorage.getItem('userRole') || 'student'
   const name = localStorage.getItem('username') || '张明'
-  
+
   userInfo.value.role = role
   userInfo.value.name = name
 }

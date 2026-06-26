@@ -38,7 +38,13 @@ const router = createRouter({
     {
       path: '/',
       component: Layout,
-      redirect: () => (getUserRole() === 'student' ? '/my-courses' : '/dashboard'),
+      redirect: () => {
+        const token = localStorage.getItem('token');
+        // 如果没登录，直接去登录页，别去尝试触发子路由的守卫！
+        if (!token) return '/login';
+        // 如果登录了，再根据角色跳转
+        return getUserRole() === 'student' ? '/my-courses' : '/dashboard';
+      },
       meta: { requiresAuth: true },
       children: [
         // ----- 仪表盘（管理员/教师） -----
@@ -83,7 +89,7 @@ const router = createRouter({
           name: 'CourseManagement',
           component: CourseManagement,
           meta: {
-            title: '课程管理',
+            title: '课程体系管理',
             icon: 'Document',
             roles: ['admin']
           }
@@ -260,8 +266,8 @@ const hasPermission = (routeRoles, userRole) => {
   return routeRoles.includes(userRole)
 }
 
-router.beforeEach((to, from, next) => {
-  // 获取 token
+router.beforeEach((to, from) => { // 【修改点1】：删除 next 参数
+                                  // 获取 token
   const token = localStorage.getItem('token')
   const userRole = getUserRole()
 
@@ -269,37 +275,33 @@ router.beforeEach((to, from, next) => {
   if (to.path === '/login') {
     if (token) {
       // 已登录，跳转到首页
-      next(getHomePath(userRole))
+      return getHomePath(userRole) // 【修改点2】：return 路径字符串
     } else {
-      next()
+      return true // 【修改点3】：return true 表示放行
     }
-    return
   }
 
   // 2. 检查是否需要登录
   if (to.meta.requiresAuth !== false) {
     if (!token) {
       // 未登录，跳转到登录页
-      next({
+      return { // 【修改点4】：return 一个包含 path 和 query 的对象
         path: '/login',
         query: { redirect: to.fullPath }
-      })
-      return
+      }
     }
 
     // 3. 检查角色权限
     const routeRoles = to.meta.roles
     if (routeRoles && !hasPermission(routeRoles, userRole)) {
       // 无权限，跳转到首页
-      next(getHomePath(userRole))
-      // 使用 ElMessage 提示（需要引入）
-      // 如果未引入 ElMessage，可以用 console.warn
       console.warn('您没有权限访问该页面')
-      return
+      return getHomePath(userRole) // 【修改点5】：return 路径字符串
     }
   }
 
-  next()
+  // 最后，如果所有检查都通过，直接放行
+  return true // 【修改点6】：结尾统一 return true
 })
 
 export default router

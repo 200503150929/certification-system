@@ -204,7 +204,7 @@
           <ul>
             <li>
               <el-icon color="green"><SuccessFilled /></el-icon>
-              密码复杂度：至少8位，包含数字、大小写字母。
+              建议密码复杂度：至少8位，包含数字、大小写字母。
             </li>
             <li>
               <el-icon color="green"><SuccessFilled /></el-icon>
