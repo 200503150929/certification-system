@@ -2,7 +2,15 @@
   <div class="goals-tab">
     <div class="tab-header">
       <span class="tab-title">培养目标列表</span>
-      <el-button type="primary" size="small" :icon="Plus" @click="handleAdd">新增目标</el-button>
+      <el-button
+          type="primary"
+          size="small"
+          :icon="Plus"
+          @click="handleAdd"
+          :disabled="disabled"
+      >
+        新增目标
+      </el-button>
     </div>
 
     <div class="goal-list" v-loading="loading">
@@ -11,8 +19,20 @@
           <span class="goal-index">目标 {{ index + 1 }}</span>
           <span class="goal-sort">排序: {{ item.sortOrder || 0 }}</span>
           <div class="goal-actions">
-            <el-button link type="primary" :icon="Edit" @click="handleEdit(item)" />
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(item.id)" />
+            <el-button
+                link
+                type="primary"
+                :icon="Edit"
+                @click="handleEdit(item)"
+                :disabled="disabled"
+            />
+            <el-button
+                link
+                type="danger"
+                :icon="Delete"
+                @click="handleDelete(item.id)"
+                :disabled="disabled"
+            />
           </div>
         </div>
         <div class="goal-content">
@@ -61,6 +81,10 @@ const props = defineProps({
   programId: {
     type: [String, Number],
     required: true
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -99,13 +123,8 @@ const loadGoals = async () => {
   }
 }
 
-// 保存全部（供父组件调用）
-const saveAll = async () => {
-  // 培养目标没有批量保存，只有单个增删改
-  ElMessage.success('培养目标已保存')
-}
-
 const handleAdd = () => {
+  if (props.disabled) return
   dialogTitle.value = '新增培养目标'
   isEdit.value = false
   formData.sortOrder = goalList.value.length + 1
@@ -113,6 +132,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
+  if (props.disabled) return
   dialogTitle.value = '编辑培养目标'
   isEdit.value = true
   editId.value = row.id
@@ -122,6 +142,7 @@ const handleEdit = (row) => {
 }
 
 const handleDelete = (id) => {
+  if (props.disabled) return
   ElMessageBox.confirm('确定要删除该培养目标吗？', '提示', { type: 'warning' }).then(async () => {
     try {
       await request.delete(`/admin/program/objectives/delete/${id}`)
@@ -180,11 +201,6 @@ watch(() => props.programId, () => {
 onMounted(() => {
   loadGoals()
 })
-
-// 暴露方法给父组件
-defineExpose({
-  saveAll
-})
 </script>
 
 <style scoped>
@@ -230,4 +246,9 @@ defineExpose({
 .goal-sort { font-size: 12px; color: #999; }
 .goal-actions { margin-left: auto; display: flex; gap: 4px; }
 .goal-content p { margin: 4px 0; color: #555; line-height: 1.6; }
+
+/* 禁用状态样式 */
+:deep(.is-disabled .el-button) {
+  cursor: not-allowed;
+}
 </style>

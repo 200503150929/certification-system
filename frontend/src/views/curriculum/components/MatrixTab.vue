@@ -14,7 +14,7 @@
           size="small"
           @click="handleSaveAll"
           :loading="saving"
-          :disabled="!hasUnsavedChanges && matrixData.length === 0"
+          :disabled="disabled || (!hasUnsavedChanges && matrixData.length === 0)"
       >
         {{ hasUnsavedChanges ? '保存矩阵 *' : '保存矩阵' }}
       </el-button>
@@ -62,10 +62,11 @@
           <template #default="scope">
             <el-select
                 v-model="scope.row.supportMap[req.id]"
-                placeholder="—"
+                placeholder="-"
                 size="small"
                 style="width: 80px"
                 @change="onSupportChange"
+                :disabled="disabled"
                 :class="getSelectClass(scope.row.supportMap[req.id])"
             >
               <el-option value="H">
@@ -78,7 +79,7 @@
                 <span class="support-option support-weak">L</span>
               </el-option>
               <el-option value="">
-                <span class="support-option support-none">—</span>
+                <span class="support-option support-none">-</span>
               </el-option>
             </el-select>
           </template>
@@ -91,7 +92,7 @@
         <span class="legend-item support-strong">■ H（强支撑）</span>
         <span class="legend-item support-medium">■ M（中支撑）</span>
         <span class="legend-item support-weak">■ L（弱支撑）</span>
-        <span class="legend-item support-none">■ —（无支撑）</span>
+        <span class="legend-item support-none">■ -（无支撑）</span>
         <span class="legend-tip">（在表格下拉框中选择）</span>
       </div>
 
@@ -114,6 +115,10 @@ const props = defineProps({
   programId: {
     type: [String, Number],
     required: true
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -163,6 +168,7 @@ const checkUnsavedChanges = () => {
 
 // 支撑关系变化时标记为未保存
 const onSupportChange = () => {
+  if (props.disabled) return
   hasUnsavedChanges.value = true
   emit('unsaved-change', true)
 }
@@ -217,17 +223,19 @@ const loadData = async () => {
         for (const req of requirements.value) {
           row.supportMap[req.id] = ''
         }
-        // 填充已有的支撑关系（将数据库中的"强"/"弱"映射为"H"/"L"）
+        // 填充已有的支撑关系（将数据库中的中文映射为英文缩写）
         const existingItems = matrixMap[obj.id] || []
         for (const item of existingItems) {
           const supportLevel = item.supportLevel || ''
           // 将中文映射为英文缩写
           if (supportLevel === '强') {
             row.supportMap[item.requirementId] = 'H'
+          } else if (supportLevel === '中') {
+            row.supportMap[item.requirementId] = 'M'
           } else if (supportLevel === '弱') {
             row.supportMap[item.requirementId] = 'L'
           } else {
-            row.supportMap[item.requirementId] = supportLevel
+            row.supportMap[item.requirementId] = ''
           }
         }
         return row
@@ -250,6 +258,10 @@ const loadData = async () => {
 
 // 保存所有目标的矩阵
 const handleSaveAll = async () => {
+  if (props.disabled) {
+    ElMessage.warning('已发布的专业不可修改')
+    return
+  }
   if (matrixData.value.length === 0) {
     ElMessage.warning('没有可保存的矩阵数据')
     return
@@ -404,7 +416,6 @@ defineExpose({
 }
 
 /* ========== 下拉框选中后的背景色 ========== */
-/* H - 强支撑 - 红色 */
 :deep(.select-strong .el-input__wrapper) {
   background-color: #fef0f0 !important;
   border-color: #f56c6c !important;
@@ -421,7 +432,6 @@ defineExpose({
   font-weight: 700;
 }
 
-/* M - 中支撑 - 橙色 */
 :deep(.select-medium .el-input__wrapper) {
   background-color: #fdf6ec !important;
   border-color: #e6a23c !important;
@@ -438,7 +448,6 @@ defineExpose({
   font-weight: 700;
 }
 
-/* L - 弱支撑 - 绿色 */
 :deep(.select-weak .el-input__wrapper) {
   background-color: #f0f9eb !important;
   border-color: #67c23a !important;
@@ -455,7 +464,6 @@ defineExpose({
   font-weight: 700;
 }
 
-/* — 无支撑 - 灰色 */
 :deep(.select-none .el-input__wrapper) {
   background-color: #f5f7fa !important;
   border-color: #dcdfe6 !important;

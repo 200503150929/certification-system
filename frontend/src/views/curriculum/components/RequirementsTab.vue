@@ -2,7 +2,15 @@
   <div class="requirements-tab">
     <div class="tab-header">
       <span class="tab-title">毕业要求列表</span>
-      <el-button type="primary" size="small" :icon="Plus" @click="handleAdd">新增要求</el-button>
+      <el-button
+          type="primary"
+          size="small"
+          :icon="Plus"
+          @click="handleAdd"
+          :disabled="disabled"
+      >
+        新增要求
+      </el-button>
     </div>
 
     <div class="requirement-list" v-loading="loading">
@@ -10,9 +18,26 @@
         <div class="requirement-header">
           <span class="requirement-code">{{ item.code }}</span>
           <div class="requirement-actions">
-            <el-button link type="primary" :icon="Edit" @click="handleEdit(item)" />
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(item.id)" />
-            <el-button link type="primary" size="small" @click="manageIndicators(item)">
+            <el-button
+                link
+                type="primary"
+                :icon="Edit"
+                @click="handleEdit(item)"
+                :disabled="disabled"
+            />
+            <el-button
+                link
+                type="danger"
+                :icon="Delete"
+                @click="handleDelete(item.id)"
+                :disabled="disabled"
+            />
+            <el-button
+                link
+                type="primary"
+                size="small"
+                @click="manageIndicators(item)"
+            >
               管理指标点
             </el-button>
           </div>
@@ -25,7 +50,13 @@
         <div v-if="expandedRequirementId === item.id" class="indicators-sub-list">
           <div class="sub-header">
             <span class="sub-title">指标点列表</span>
-            <el-button type="primary" size="small" :icon="Plus" @click="addIndicator(item.id)">
+            <el-button
+                type="primary"
+                size="small"
+                :icon="Plus"
+                @click="addIndicator(item.id)"
+                :disabled="disabled"
+            >
               新增指标点
             </el-button>
           </div>
@@ -39,8 +70,24 @@
             </el-table-column>
             <el-table-column label="操作" width="120">
               <template #default="scope">
-                <el-button link type="primary" size="small" @click="editIndicator(scope.row)">编辑</el-button>
-                <el-button link type="danger" size="small" @click="deleteIndicator(scope.row.id)">删除</el-button>
+                <el-button
+                    link
+                    type="primary"
+                    size="small"
+                    @click="editIndicator(scope.row)"
+                    :disabled="disabled"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                    link
+                    type="danger"
+                    size="small"
+                    @click="deleteIndicator(scope.row.id)"
+                    :disabled="disabled"
+                >
+                  删除
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -122,6 +169,10 @@ const props = defineProps({
   programId: {
     type: [String, Number],
     required: true
+  },
+  disabled: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -201,11 +252,6 @@ const loadIndicators = async (requirementId) => {
   }
 }
 
-// 保存全部（供父组件调用）
-const saveAll = async () => {
-  ElMessage.success('毕业要求已保存')
-}
-
 // 展开管理指标点
 const manageIndicators = (item) => {
   expandedRequirementId.value = expandedRequirementId.value === item.id ? null : item.id
@@ -213,6 +259,7 @@ const manageIndicators = (item) => {
 
 // 新增指标点
 const addIndicator = (requirementId) => {
+  if (props.disabled) return
   currentRequirementId.value = requirementId
   indicatorDialogTitle.value = '新增指标点'
   isIndicatorEdit.value = false
@@ -225,6 +272,7 @@ const addIndicator = (requirementId) => {
 
 // 编辑指标点
 const editIndicator = (row) => {
+  if (props.disabled) return
   indicatorDialogTitle.value = '编辑指标点'
   isIndicatorEdit.value = true
   indicatorEditId.value = row.id
@@ -238,11 +286,11 @@ const editIndicator = (row) => {
 
 // 删除指标点
 const deleteIndicator = (id) => {
+  if (props.disabled) return
   ElMessageBox.confirm('确定要删除该指标点吗？', '提示', { type: 'warning' }).then(async () => {
     try {
       await request.delete(`/admin/program/indicators/delete/${id}`)
       ElMessage.success('删除成功')
-      // 刷新当前展开的指标点列表
       if (expandedRequirementId.value) {
         await loadIndicators(expandedRequirementId.value)
       }
@@ -298,6 +346,7 @@ const resetIndicatorForm = () => {
 
 // 毕业要求增删改
 const handleAdd = () => {
+  if (props.disabled) return
   dialogTitle.value = '新增毕业要求'
   isEdit.value = false
   formData.code = `GR-${requirementList.value.length + 1}`
@@ -305,6 +354,7 @@ const handleAdd = () => {
 }
 
 const handleEdit = (row) => {
+  if (props.disabled) return
   dialogTitle.value = '编辑毕业要求'
   isEdit.value = true
   editId.value = row.id
@@ -314,6 +364,7 @@ const handleEdit = (row) => {
 }
 
 const handleDelete = (id) => {
+  if (props.disabled) return
   ElMessageBox.confirm('确定要删除该毕业要求吗？删除后其下指标点也将被删除。', '提示', { type: 'warning' }).then(async () => {
     try {
       await request.delete(`/admin/program/requirements/delete/${id}`)
@@ -371,11 +422,6 @@ watch(() => props.programId, () => {
 
 onMounted(() => {
   loadRequirements()
-})
-
-// 暴露方法给父组件
-defineExpose({
-  saveAll
 })
 </script>
 

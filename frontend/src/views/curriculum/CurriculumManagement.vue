@@ -44,7 +44,14 @@
         <el-table-column prop="createdAt" label="创建时间" width="180" />
         <el-table-column label="操作" width="280" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" @click="goToDetail(scope.row)">编辑</el-button>
+            <!-- 已发布显示"查看"，草稿显示"编辑" -->
+            <el-button
+                link
+                :type="scope.row.status === 'published' ? 'info' : 'primary'"
+                @click="goToDetail(scope.row)"
+            >
+              {{ scope.row.status === 'published' ? '查看' : '编辑' }}
+            </el-button>
             <el-button
                 v-if="scope.row.status === 'draft'"
                 link type="success"

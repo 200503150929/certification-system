@@ -9,6 +9,11 @@
           {{ programStatus === 'published' ? '已发布' : '草稿' }}
         </el-tag>
         <span class="version-text">v{{ programVersion }}</span>
+        <!-- 已发布状态提示 -->
+        <el-tag v-if="programStatus === 'published'" type="info" size="small" effect="plain">
+          <el-icon><InfoFilled /></el-icon>
+          该专业培养方案已发布，不可编辑
+        </el-tag>
       </div>
       <div>
         <el-button
@@ -35,6 +40,7 @@
           <GoalsTab
               ref="goalsRef"
               :program-id="programId"
+              :disabled="programStatus === 'published'"
               @change="handleDataChange"
           />
         </el-tab-pane>
@@ -42,6 +48,7 @@
           <RequirementsTab
               ref="requirementsRef"
               :program-id="programId"
+              :disabled="programStatus === 'published'"
               @change="handleDataChange"
           />
         </el-tab-pane>
@@ -49,6 +56,7 @@
           <MatrixTab
               ref="matrixRef"
               :program-id="programId"
+              :disabled="programStatus === 'published'"
               @change="handleDataChange"
               @tab-change="switchTab"
           />
@@ -59,10 +67,10 @@
 </template>
 
 <script setup>
-import {ref, onMounted} from 'vue'
-import {useRoute, useRouter} from 'vue-router'
-import {ElMessage} from 'element-plus'
-import {ArrowLeft} from '@element-plus/icons-vue'
+import { ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { ArrowLeft, InfoFilled } from '@element-plus/icons-vue'
 import request from '@/api/request'
 import GoalsTab from './components/GoalsTab.vue'
 import RequirementsTab from './components/RequirementsTab.vue'
@@ -170,6 +178,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 16px;
+  flex-wrap: wrap;
 }
 
 .header-left h2 {
