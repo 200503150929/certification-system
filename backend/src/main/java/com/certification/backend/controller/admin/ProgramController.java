@@ -17,10 +17,9 @@ import java.util.List;
  *
  * 涵盖：专业/培养方案、培养目标、毕业要求、指标点、培养目标-毕业要求支撑矩阵
  */
-@Tag(name = "03-人才培养方案管理", description = "专业/培养方案、培养目标、毕业要求、指标点、支撑矩阵管理")
+@Tag(name = "03-人才培养方案管理", description = "专业/培养方案、培养目标、毕业要求、指标点、支撑矩阵管理（管理员可读写，教师/学生仅可查看）")
 @RestController
 @RequestMapping("/admin/program")
-@PreAuthorize("hasRole('ADMIN')")
 public class ProgramController {
 
     private final ProgramService programService;
@@ -72,12 +71,14 @@ public class ProgramController {
     }
 
     @Operation(summary = "新增专业")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/add")
     public ResponseVO<ProgramResponse> add(@Valid @RequestBody ProgramRequest request) {
         return ResponseVO.success(programService.addProgram(request));
     }
 
     @Operation(summary = "编辑专业")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/update")
     public ResponseVO<ProgramResponse> update(@Valid @RequestBody ProgramRequest request) {
         if (request.getId() == null) {
@@ -87,6 +88,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "删除专业", description = "会级联删除培养目标、毕业要求、指标点等关联数据")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/delete/{id}")
     public ResponseVO<Void> delete(@PathVariable Long id) {
         programService.deleteProgram(id);
@@ -94,6 +96,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "发布专业", description = "将状态从 draft 改为 published")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/publish/{id}")
     public ResponseVO<Void> publish(@PathVariable Long id) {
         programService.publishProgram(id);
@@ -101,6 +104,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "取消发布", description = "将状态从 published 改为 draft")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/unpublish/{id}")
     public ResponseVO<Void> unpublish(@PathVariable Long id) {
         programService.unpublishProgram(id);
@@ -122,12 +126,14 @@ public class ProgramController {
     }
 
     @Operation(summary = "新增培养目标")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/objectives/add")
     public ResponseVO<EducationalObjectiveResponse> addObjective(@Valid @RequestBody EducationalObjectiveRequest request) {
         return ResponseVO.success(educationalObjectiveService.add(request));
     }
 
     @Operation(summary = "编辑培养目标")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/objectives/update")
     public ResponseVO<EducationalObjectiveResponse> updateObjective(@Valid @RequestBody EducationalObjectiveRequest request) {
         if (request.getId() == null) {
@@ -137,6 +143,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "删除培养目标")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/objectives/delete/{id}")
     public ResponseVO<Void> deleteObjective(@PathVariable Long id) {
         educationalObjectiveService.delete(id);
@@ -164,12 +171,14 @@ public class ProgramController {
     }
 
     @Operation(summary = "新增毕业要求")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/requirements/add")
     public ResponseVO<GraduationRequirementResponse> addRequirement(@Valid @RequestBody GraduationRequirementRequest request) {
         return ResponseVO.success(graduationRequirementService.add(request));
     }
 
     @Operation(summary = "编辑毕业要求")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/requirements/update")
     public ResponseVO<GraduationRequirementResponse> updateRequirement(@Valid @RequestBody GraduationRequirementRequest request) {
         if (request.getId() == null) {
@@ -179,6 +188,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "删除毕业要求", description = "会级联删除下属指标点")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/requirements/delete/{id}")
     public ResponseVO<Void> deleteRequirement(@PathVariable Long id) {
         graduationRequirementService.delete(id);
@@ -200,12 +210,14 @@ public class ProgramController {
     }
 
     @Operation(summary = "新增指标点")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/indicators/add")
     public ResponseVO<IndicatorPointResponse> addIndicator(@Valid @RequestBody IndicatorPointRequest request) {
         return ResponseVO.success(indicatorPointService.add(request));
     }
 
     @Operation(summary = "编辑指标点")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/indicators/update")
     public ResponseVO<IndicatorPointResponse> updateIndicator(@Valid @RequestBody IndicatorPointRequest request) {
         if (request.getId() == null) {
@@ -215,6 +227,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "删除指标点")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/indicators/delete/{id}")
     public ResponseVO<Void> deleteIndicator(@PathVariable Long id) {
         indicatorPointService.delete(id);
@@ -230,6 +243,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "批量保存支撑矩阵", description = "全量替换某培养目标的毕业要求支撑关系（先删后插）")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/matrix/batch-save")
     public ResponseVO<List<ObjectiveRequirementMatrixResponse>> batchSaveMatrix(
             @Valid @RequestBody ObjectiveRequirementMatrixBatchRequest request) {
@@ -237,6 +251,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "新增支撑关系")
+    @PreAuthorize("hasRole('ADMIN')")
     @PostMapping("/matrix/add")
     public ResponseVO<ObjectiveRequirementMatrixResponse> addMatrix(
             @Valid @RequestBody ObjectiveRequirementMatrixRequest request) {
@@ -244,6 +259,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "编辑支撑关系")
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/matrix/update")
     public ResponseVO<ObjectiveRequirementMatrixResponse> updateMatrix(
             @Valid @RequestBody ObjectiveRequirementMatrixRequest request) {
@@ -254,6 +270,7 @@ public class ProgramController {
     }
 
     @Operation(summary = "删除支撑关系")
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/matrix/delete/{id}")
     public ResponseVO<Void> deleteMatrix(@PathVariable Long id) {
         objectiveRequirementMatrixService.delete(id);

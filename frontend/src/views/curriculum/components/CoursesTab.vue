@@ -15,7 +15,7 @@
             @keyup.enter="handleSearch"
         />
         <el-button @click="handleSearch">搜索</el-button>
-        <el-button :icon="Download" @click="handleExport" :loading="exporting">导出</el-button>
+        <el-button :icon="Download" v-if="!disabled" @click="handleExport" :loading="exporting">导出</el-button>
       </div>
     </div>
 

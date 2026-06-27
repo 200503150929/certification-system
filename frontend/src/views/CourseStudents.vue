@@ -19,19 +19,12 @@
       </div>
 
       <el-table :data="filteredStudents" border style="width: 100%">
-        <el-table-column prop="studentId" label="学号" width="120" />
+        <el-table-column prop="studentNo" label="学号" width="120" />
         <el-table-column prop="studentName" label="姓名" width="120" />
-        <el-table-column label="成绩概况" min-width="250">
+        <el-table-column label="最终成绩" width="120" align="center">
           <template #default="scope">
-            <el-tag
-              v-for="g in scope.row.grades"
-              :key="g.assessmentId"
-              size="small"
-              style="margin-right: 4px; margin-bottom: 2px"
-            >
-              {{ g.assessmentName }}: {{ g.score }}
-            </el-tag>
-            <span v-if="!scope.row.grades || scope.row.grades.length === 0" style="color: #999">未录入</span>
+            <span v-if="scope.row.totalScore != null" style="font-weight: 600">{{ scope.row.totalScore }}</span>
+            <span v-else style="color: #999">未录入</span>
           </template>
         </el-table-column>
       </el-table>
@@ -65,7 +58,7 @@ const filteredStudents = computed(() => {
   if (!keyword.value) return students.value
   const k = keyword.value.toLowerCase()
   return students.value.filter(s =>
-    String(s.studentId).includes(k) || (s.studentName && s.studentName.includes(k))
+    String(s.studentNo).includes(k) || (s.studentName && s.studentName.toLowerCase().includes(k))
   )
 })
 
@@ -78,27 +71,10 @@ const loadData = async () => {
       courseName.value = offeringRes.data.courseName || '未知课程'
     }
 
-    // 加载成绩（含学生信息）
-    const gradesRes = await request.get('/teacher/grades/list', {
-      params: { offeringId, pageSize: 999 }
-    })
-    if (gradesRes.status === 'success' && gradesRes.data && gradesRes.data.list) {
-      const studentMap = new Map()
-      gradesRes.data.list.forEach(g => {
-        if (!studentMap.has(g.studentId)) {
-          studentMap.set(g.studentId, {
-            studentId: g.studentId,
-            studentName: g.studentName,
-            grades: []
-          })
-        }
-        studentMap.get(g.studentId).grades.push({
-          assessmentId: g.assessmentId,
-          assessmentName: g.assessmentName,
-          score: g.score
-        })
-      })
-      students.value = Array.from(studentMap.values())
+    // 加载学生成绩（新 API：四列固定成绩，只显示最终成绩）
+    const gradesRes = await request.get(`/teacher/student-grades/offering/${offeringId}`)
+    if (gradesRes.status === 'success' && gradesRes.data) {
+      students.value = gradesRes.data
     }
   } catch (e) {
     students.value = []

@@ -14,6 +14,7 @@ public class CourseObjectiveResponse {
 
     private Long id;
     private Long offeringId;
+    private String code;
     private String description;
     private BigDecimal weight;
     private String createdAt;

@@ -1,6 +1,7 @@
 package com.certification.backend.controller.teacher;
 
 import com.certification.backend.dto.request.MatrixItemRequest;
+import com.certification.backend.dto.response.IndicatorInfoResponse;
 import com.certification.backend.dto.response.MatrixItemResponse;
 import com.certification.backend.dto.response.ResponseVO;
 import com.certification.backend.service.ObjectiveIndicatorMatrixService;
@@ -42,6 +43,13 @@ public class ObjectiveIndicatorMatrixController {
             @Valid @RequestBody List<MatrixItemRequest> items) {
         String username = getCurrentUsername();
         return ResponseVO.success(matrixService.batchSaveMatrix(offeringId, items, username));
+    }
+
+    @Operation(summary = "获取开课所属专业的所有指标点", description = "供矩阵配置时生成列头")
+    @GetMapping("/indicators/{offeringId}")
+    public ResponseVO<List<IndicatorInfoResponse>> getIndicators(@PathVariable Long offeringId) {
+        String username = getCurrentUsername();
+        return ResponseVO.success(matrixService.getIndicatorsByOffering(offeringId, username));
     }
 
     private String getCurrentUsername() {

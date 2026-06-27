@@ -16,6 +16,9 @@ public class CourseObjective {
     @Column(name = "offering_id")
     private Long offeringId;
 
+    @Column(length = 20)
+    private String code;
+
     @Column(columnDefinition = "TEXT")
     private String description;
 

@@ -41,6 +41,12 @@
           <span>人才培养方案管理</span>
         </el-menu-item>
 
+        <!-- 人才培养方案查看（教师/学生只读） -->
+        <el-menu-item v-if="userRole === 'teacher' || userRole === 'student'" index="/curriculum/view">
+          <el-icon><DocumentCopy /></el-icon>
+          <span>人才培养方案</span>
+        </el-menu-item>
+
         <!-- 用户管理（管理员） -->
         <el-menu-item v-if="userRole === 'admin'" index="/users">
           <el-icon><User /></el-icon>
@@ -127,7 +133,7 @@
       <!-- 内容区域 -->
       <el-main>
         <router-view v-slot="{ Component }">
-          <keep-alive :include="['CurriculumManagement', 'ProgramDetail', 'CurriculumGoals', 'CurriculumRequirements', 'CurriculumIndicators', 'CurriculumMatrix']">
+          <keep-alive :include="['CurriculumManagement', 'ProgramDetail', 'CurriculumView', 'ProgramView', 'CurriculumGoals', 'CurriculumRequirements', 'CurriculumIndicators', 'CurriculumMatrix']">
             <component :is="Component" />
           </keep-alive>
         </router-view>
@@ -185,6 +191,12 @@ const breadcrumbConfig = {
     items: [
       { name: '人才培养方案管理', path: '/curriculum/management' },
       { name: '专业详情' }
+    ]
+  },
+  // 人才培养方案查看（教师/学生）
+  '/curriculum/view': {
+    items: [
+      { name: '人才培养方案' }
     ]
   },
 
@@ -250,6 +262,16 @@ const getBreadcrumbConfig = (path) => {
     }
   }
 
+  // 动态路由匹配（如 /curriculum/view/1）- 教师/学生端
+  if (path.startsWith('/curriculum/view/')) {
+    return {
+      items: [
+        { name: '人才培养方案', path: '/curriculum/view' },
+        { name: '专业详情' }
+      ]
+    }
+  }
+
   // 默认：只显示当前路由名称
   return {
     items: [{ name: route.meta?.title || route.name || '未知页面' }]
@@ -267,6 +289,8 @@ const breadcrumbItems = computed(() => {
 const activeMenu = computed(() => {
   // 专业详情页高亮"人才培养方案管理"
   if (route.path.startsWith('/curriculum/detail/')) return '/curriculum/management'
+  // 人才培养方案查看页高亮
+  if (route.path.startsWith('/curriculum/view/')) return '/curriculum/view'
   // 人才培养方案所有子页面都高亮"人才培养方案管理"
   if (route.path.startsWith('/curriculum/')) return '/curriculum/management'
   // 修改密码高亮"个人信息"

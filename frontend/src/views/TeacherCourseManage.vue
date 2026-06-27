@@ -42,54 +42,7 @@
       </div>
 
       <el-tabs v-model="activeTab" @tab-change="handleTabChange">
-        <el-tab-pane label="学生名单" name="students">
-          <div class="toolbar">
-            <el-input v-model="studentKeyword" placeholder="搜索姓名/学号" style="width: 260px" clearable />
-            <el-button type="primary" :icon="Download">导出名单</el-button>
-          </div>
-          <el-table :data="filteredStudents" border style="width: 100%" v-loading="studentsLoading">
-            <el-table-column prop="studentId" label="学号" width="120" />
-            <el-table-column prop="studentName" label="姓名" width="120" />
-            <el-table-column label="成绩" min-width="200">
-              <template #default="scope">
-                <span v-for="(g, idx) in scope.row.grades" :key="idx">
-                  <el-tag size="small" style="margin-right: 4px">{{ g.assessmentName }}: {{ g.score }}</el-tag>
-                </span>
-                <span v-if="!scope.row.grades || scope.row.grades.length === 0" style="color: #999">未录入</span>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-tab-pane>
-
-        <el-tab-pane label="成绩录入" name="grades">
-          <div class="toolbar">
-            <el-select v-model="selectedAssessmentId" placeholder="选择考核环节" style="width: 240px" @change="fetchGrades">
-              <el-option v-for="a in assessments" :key="a.id" :label="a.name" :value="a.id" />
-            </el-select>
-            <el-button :icon="Download" @click="exportGrades">导出成绩</el-button>
-          </div>
-          <el-table :data="gradeTableData" border style="width: 100%" v-loading="gradesLoading">
-            <el-table-column prop="studentId" label="学号" width="120" />
-            <el-table-column prop="studentName" label="姓名" width="120" />
-            <el-table-column label="成绩" width="200">
-              <template #default="scope">
-                <el-input-number v-model="scope.row.score" :min="0" :max="100" size="small" :precision="1" />
-              </template>
-            </el-table-column>
-            <el-table-column label="操作" width="120">
-              <template #default="scope">
-                <el-button link type="primary" @click="saveGrade(scope.row)">保存</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-          <div v-if="!selectedAssessmentId" style="text-align: center; color: #999; padding: 40px">
-            请先选择考核环节
-          </div>
-          <div v-if="!assessments.length" style="text-align: center; color: #999; padding: 40px">
-            暂无考核环节，请在"课程目标"中先设置考核环节
-          </div>
-        </el-tab-pane>
-
+        <!-- ========== 课程目标 Tab ========== -->
         <el-tab-pane label="课程目标" name="objectives">
           <div class="toolbar">
             <el-button type="primary" :icon="Plus" @click="openObjectiveDialog()">新增课程目标</el-button>
@@ -105,8 +58,68 @@
               </template>
             </el-table-column>
           </el-table>
+
+          <!-- 课程目标-毕业要求指标点支撑矩阵 -->
+          <div class="matrix-section" v-if="objectives.length > 0">
+            <div class="tab-header">
+              <div class="header-left">
+                <span class="tab-title">课程目标-毕业要求指标点支撑矩阵</span>
+                <el-tag v-if="matrixUnsaved" type="warning" size="small" effect="plain">未保存</el-tag>
+              </div>
+              <el-button type="primary" size="small" @click="saveMatrix" :loading="matrixSaving">
+                {{ matrixUnsaved ? '保存矩阵 *' : '保存矩阵' }}
+              </el-button>
+            </div>
+
+            <el-alert v-if="matrixIndicators.length === 0" type="info" :closable="false" show-icon style="margin-bottom:12px">
+              该专业暂无毕业要求指标点数据，请先联系管理员在培养方案中配置指标点
+            </el-alert>
+
+            <el-table v-if="matrixIndicators.length > 0" :data="matrixRows" border style="width: 100%" max-height="500" v-loading="matrixLoading">
+              <el-table-column prop="code" label="课程目标" width="160" fixed>
+                <template #default="scope">
+                  <span class="obj-label">{{ scope.row.code }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column
+                v-for="ind in matrixIndicators" :key="ind.indicatorId"
+                :label="ind.indicatorCode" width="100" align="center"
+              >
+                <template #header>
+                  <div class="indicator-header">
+                    <el-tooltip :content="ind.indicatorDesc" placement="top" effect="dark">
+                      <span class="indicator-code">{{ ind.indicatorCode }}</span>
+                    </el-tooltip>
+                    <span class="indicator-req">{{ ind.requirementCode }}</span>
+                  </div>
+                </template>
+                <template #default="scope">
+                  <el-select
+                    v-model="scope.row.supportMap[ind.indicatorId]"
+                    placeholder="-" size="small" style="width:70px"
+                    @change="onMatrixChange"
+                    :class="getSelectClass(scope.row.supportMap[ind.indicatorId])"
+                  >
+                    <el-option value="H"><span class="so so-h">H</span></el-option>
+                    <el-option value="M"><span class="so so-m">M</span></el-option>
+                    <el-option value="L"><span class="so so-l">L</span></el-option>
+                    <el-option value=""><span class="so so-none">-</span></el-option>
+                  </el-select>
+                </template>
+              </el-table-column>
+            </el-table>
+
+            <div class="matrix-legend" v-if="matrixIndicators.length > 0">
+              <span class="legend-title">支撑强度：</span>
+              <span class="legend-item sh">■ H 强支撑</span>
+              <span class="legend-item sm">■ M 中支撑</span>
+              <span class="legend-item sl">■ L 弱支撑</span>
+              <span class="legend-item sn">■ - 无支撑</span>
+            </div>
+          </div>
         </el-tab-pane>
 
+        <!-- ========== 教学资源 Tab ========== -->
         <el-tab-pane label="教学资源" name="resources">
           <div class="toolbar">
             <el-button type="primary" :icon="Upload" @click="openResourceUpload">上传资源</el-button>
@@ -126,6 +139,122 @@
               </template>
             </el-table-column>
           </el-table>
+        </el-tab-pane>
+
+        <!-- ========== 学生名单 Tab ========== -->
+        <el-tab-pane label="学生名单" name="students">
+          <div class="toolbar">
+            <el-input v-model="studentKeyword" placeholder="搜索姓名/学号" style="width: 260px" clearable />
+            <el-button type="primary" :icon="Download" @click="exportStudentList">导出学生成绩</el-button>
+          </div>
+          <el-table :data="filteredStudents" border style="width: 100%" v-loading="studentsLoading">
+            <el-table-column prop="studentNo" label="学号" width="120" />
+            <el-table-column prop="studentName" label="姓名" width="100" />
+            <el-table-column label="最终成绩" align="center">
+              <template #default="scope">
+                <span v-if="scope.row.totalScore != null" style="font-weight: 600">{{ scope.row.totalScore }}</span>
+                <span v-else style="color: #999">未录入</span>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <!-- ========== 成绩录入 Tab ========== -->
+        <el-tab-pane label="成绩录入" name="grades">
+          <div class="toolbar">
+            <div>
+              <el-button type="primary" :icon="Upload" @click="openGradeImport">批量导入</el-button>
+              <el-button :icon="Download" @click="exportStudentGrades">导出成绩</el-button>
+              <el-button link type="warning" @click="openWeightDialog">配置权重</el-button>
+            </div>
+            <div class="weight-info" v-if="gradeWeights">
+              <span class="weight-tag">平时 {{ pct(gradeWeights.dailyWeight) }}%</span>
+              <span class="weight-tag">实验报告 {{ pct(gradeWeights.reportWeight) }}%</span>
+              <span class="weight-tag">期中 {{ pct(gradeWeights.midtermWeight) }}%</span>
+              <span class="weight-tag">期末 {{ pct(gradeWeights.finalWeight) }}%</span>
+            </div>
+            <el-button type="success" :icon="Check" @click="submitAllGrades" :loading="submittingGrades">
+              提交全部成绩
+            </el-button>
+          </div>
+          <div class="grade-table-wrap" ref="gradeTableWrapRef">
+            <el-table :data="gradeEntryData" border style="width: 100%" v-loading="gradesLoading"
+              :table-layout="'auto'">
+              <!-- 固定列：学号、姓名 -->
+              <el-table-column prop="studentNo" label="学号" width="110" />
+              <el-table-column prop="studentName" label="姓名" width="90" />
+
+              <!-- 多级表头：成绩明细 -->
+              <el-table-column label="成绩明细" align="center">
+                <el-table-column label="平时成绩" :width="flexColWidth" align="center">
+                  <template #default="scope">
+                    <template v-if="scope.row.editing">
+                      <el-input-number v-model="scope.row.dailyScore" :min="0" :max="100"
+                        :precision="1" size="small" controls-position="right" style="width:100%" />
+                    </template>
+                    <template v-else>
+                      <span class="score-cell">{{ scope.row.dailyScore != null ? scope.row.dailyScore : '-' }}</span>
+                    </template>
+                  </template>
+                </el-table-column>
+                <el-table-column label="实验报告" :width="flexColWidth" align="center">
+                  <template #default="scope">
+                    <template v-if="scope.row.editing">
+                      <el-input-number v-model="scope.row.reportScore" :min="0" :max="100"
+                        :precision="1" size="small" controls-position="right" style="width:100%" />
+                    </template>
+                    <template v-else>
+                      <span class="score-cell">{{ scope.row.reportScore != null ? scope.row.reportScore : '-' }}</span>
+                    </template>
+                  </template>
+                </el-table-column>
+                <el-table-column label="期中考试" :width="flexColWidth" align="center">
+                  <template #default="scope">
+                    <template v-if="scope.row.editing">
+                      <el-input-number v-model="scope.row.midtermScore" :min="0" :max="100"
+                        :precision="1" size="small" controls-position="right" style="width:100%" />
+                    </template>
+                    <template v-else>
+                      <span class="score-cell">{{ scope.row.midtermScore != null ? scope.row.midtermScore : '-' }}</span>
+                    </template>
+                  </template>
+                </el-table-column>
+                <el-table-column label="期末考试" :width="flexColWidth" align="center">
+                  <template #default="scope">
+                    <template v-if="scope.row.editing">
+                      <el-input-number v-model="scope.row.finalScore" :min="0" :max="100"
+                        :precision="1" size="small" controls-position="right" style="width:100%" />
+                    </template>
+                    <template v-else>
+                      <span class="score-cell">{{ scope.row.finalScore != null ? scope.row.finalScore : '-' }}</span>
+                    </template>
+                  </template>
+                </el-table-column>
+              </el-table-column>
+
+              <!-- 最终成绩 -->
+              <el-table-column label="最终成绩" :width="flexColWidth" align="center">
+                <template #default="scope">
+                  <span v-if="scope.row.computedTotal != null" class="score-cell total-score">
+                    {{ scope.row.computedTotal }}
+                  </span>
+                  <span v-else class="score-cell empty">-</span>
+                </template>
+              </el-table-column>
+
+              <!-- 操作列 -->
+              <el-table-column label="操作" width="100" align="center">
+                <template #default="scope">
+                  <el-button v-if="scope.row.editing" link type="primary" @click="finishEditRow(scope.$index)">
+                    完成
+                  </el-button>
+                  <el-button v-else link type="primary" @click="startEditRow(scope.$index)">
+                    编辑
+                  </el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -167,21 +296,75 @@
         </template>
       </el-upload>
     </el-dialog>
+
+    <!-- 批量导入成绩弹窗 -->
+    <el-dialog v-model="importDialogVisible" title="批量导入成绩" width="450px" @close="handleImportDialogClose">
+      <el-upload
+        ref="gradeUploadRef"
+        drag
+        :action="`/api/teacher/student-grades/import/${offeringId}`"
+        :headers="uploadHeaders"
+        :on-success="handleGradeImportSuccess"
+        :on-error="handleGradeImportError"
+        accept=".xlsx,.xls"
+      >
+        <el-icon><UploadFilled /></el-icon>
+        <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+        <template #tip>
+          <div class="el-upload__tip">
+            Excel格式：第1行表头，列顺序为 学号、平时成绩、实验报告、期中考试、期末考试
+          </div>
+        </template>
+      </el-upload>
+    </el-dialog>
+
+    <!-- 权重配置弹窗 -->
+    <el-dialog v-model="weightDialogVisible" title="成绩权重配置" width="480px">
+      <el-form ref="weightFormRef" :model="weightForm" label-width="110px">
+        <el-form-item label="平时成绩权重">
+          <el-input-number v-model="weightForm.dailyWeight" :min="0" :max="100" :step="5" :precision="0" size="default" style="width:200px" />
+          <span style="margin-left:8px;color:#909399">%</span>
+        </el-form-item>
+        <el-form-item label="实验报告权重">
+          <el-input-number v-model="weightForm.reportWeight" :min="0" :max="100" :step="5" :precision="0" size="default" style="width:200px" />
+          <span style="margin-left:8px;color:#909399">%</span>
+        </el-form-item>
+        <el-form-item label="期中考试权重">
+          <el-input-number v-model="weightForm.midtermWeight" :min="0" :max="100" :step="5" :precision="0" size="default" style="width:200px" />
+          <span style="margin-left:8px;color:#909399">%</span>
+        </el-form-item>
+        <el-form-item label="期末考试权重">
+          <el-input-number v-model="weightForm.finalWeight" :min="0" :max="100" :step="5" :precision="0" size="default" style="width:200px" />
+          <span style="margin-left:8px;color:#909399">%</span>
+        </el-form-item>
+        <el-form-item>
+          <span :style="{ color: weightSum === 100 ? '#67c23a' : '#f56c6c', fontSize: '14px' }">
+            合计：{{ weightSum }}%（{{ weightSum === 100 ? '✓ 有效' : '✗ 必须等于100%' }}）
+          </span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="weightDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitWeights" :loading="weightSubmitting" :disabled="weightSum !== 100">
+          保存
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download, Plus, Upload, UploadFilled } from '@element-plus/icons-vue'
+import { Download, Plus, Upload, UploadFilled, Check } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
 const route = useRoute()
 const offeringId = computed(() => route.params.id)
 
 // ============ 状态 ============
-const activeTab = ref('students')
+const activeTab = ref('objectives')
 const pageLoading = ref(false)
 const studentKeyword = ref('')
 
@@ -195,25 +378,73 @@ const courseInfo = ref({
   semester: ''
 })
 
-// ============ 学生 ============
+// ============ 学生名单 ============
 const studentsLoading = ref(false)
 const rawStudents = ref([])
 
 const studentCount = computed(() => rawStudents.value.length)
 const filteredStudents = computed(() => {
-  const kw = studentKeyword.value.trim()
+  const kw = studentKeyword.value.trim().toLowerCase()
   if (!kw) return rawStudents.value
   return rawStudents.value.filter(s =>
-    String(s.studentId).includes(kw) || (s.studentName && s.studentName.includes(kw))
+    String(s.studentNo).includes(kw) || (s.studentName && s.studentName.toLowerCase().includes(kw))
   )
 })
 
-// ============ 成绩 ============
+// ============ 成绩录入 ============
 const gradesLoading = ref(false)
-const assessments = ref([])
-const selectedAssessmentId = ref(null)
-const gradeTableData = ref([])
+const gradeEntryData = ref([])
+const submittingGrades = ref(false)
+const importDialogVisible = ref(false)
+const gradeUploadRef = ref(null)
+const gradeTableWrapRef = ref(null)
+const flexColWidth = ref(130) // 5个成绩列每列宽度，动态计算
 
+// 权重配置
+const gradeWeights = ref(null)
+const weightDialogVisible = ref(false)
+const weightFormRef = ref(null)
+const weightSubmitting = ref(false)
+const weightForm = ref({ dailyWeight: 25, reportWeight: 25, midtermWeight: 25, finalWeight: 25 })
+
+const weightSum = computed(() =>
+  weightForm.value.dailyWeight + weightForm.value.reportWeight +
+  weightForm.value.midtermWeight + weightForm.value.finalWeight
+)
+
+const hasEdits = computed(() => gradeEntryData.value.some(row => row.editing))
+
+// 根据权重计算每行的最终成绩（加权平均）
+function computeRowTotal(row) {
+  if (!gradeWeights.value) return null
+  let sum = 0, wSum = 0
+  const w = gradeWeights.value
+  if (row.dailyScore != null)  { sum += row.dailyScore * w.dailyWeight;  wSum += w.dailyWeight }
+  if (row.reportScore != null)  { sum += row.reportScore * w.reportWeight;  wSum += w.reportWeight }
+  if (row.midtermScore != null) { sum += row.midtermScore * w.midtermWeight; wSum += w.midtermWeight }
+  if (row.finalScore != null)   { sum += row.finalScore * w.finalWeight;   wSum += w.finalWeight }
+  return wSum > 0 ? (sum / wSum).toFixed(1) : null
+}
+
+function pct(val) { return val != null ? (val * 100).toFixed(0) : '0' }
+
+// 重新计算弹性列宽（5列平分：4明细+1最终成绩）
+function recalcColumnWidth() {
+  nextTick(() => {
+    const wrap = gradeTableWrapRef.value
+    if (wrap) {
+      const total = wrap.clientWidth
+      const fixed = 110 + 90 + 100 // 学号 + 姓名 + 操作 (含border约8px)
+      const w = Math.floor((total - fixed) / 5)
+      flexColWidth.value = Math.max(w, 80)
+    }
+  })
+}
+
+let resizeObserver = null
+
+// ============ 考核环节（仅用于计数） ============
+const assessments = ref([])
 const assessmentCount = computed(() => assessments.value.length)
 
 // ============ 课程目标 ============
@@ -227,6 +458,78 @@ const objForm = ref({ code: '', description: '', weight: 0.5 })
 
 const objectiveCount = computed(() => objectives.value.length)
 const objectiveDialogTitle = computed(() => editingObjectiveId.value ? '编辑课程目标' : '新增课程目标')
+
+// ============ 课程目标-指标点矩阵 ============
+const matrixLoading = ref(false)
+const matrixSaving = ref(false)
+const matrixUnsaved = ref(false)
+const matrixIndicators = ref([])       // 所有指标点（列头）
+const matrixRows = ref([])             // 每行 = 一个课程目标, supportMap = {indicatorId: H/M/L/''}
+
+const getSelectClass = (val) => {
+  const m = { H: 'ss-h', M: 'ss-m', L: 'ss-l', '': 'ss-n' }
+  return m[val] || ''
+}
+
+const onMatrixChange = () => { matrixUnsaved.value = true }
+
+const fetchMatrixData = async () => {
+  if (objectives.value.length === 0) { matrixRows.value = []; return }
+  matrixLoading.value = true
+  try {
+    // 获取指标点
+    const indRes = await request.get(`/teacher/objectives/indicators/${offeringId.value}`)
+    matrixIndicators.value = indRes.data || []
+
+    // 获取已有矩阵关系
+    const matRes = await request.get(`/teacher/objectives/matrix/${offeringId.value}`)
+    const items = matRes.data || []
+
+    // 构建每行的 supportMap
+    const itemMap = {}
+    for (const it of items) {
+      if (!itemMap[it.objectiveId]) itemMap[it.objectiveId] = {}
+      itemMap[it.objectiveId][it.indicatorId] = it.supportLevel
+    }
+
+    matrixRows.value = objectives.value.map(obj => {
+      const row = { objectiveId: obj.id, code: obj.code, supportMap: {} }
+      for (const ind of matrixIndicators.value) {
+        const existing = (itemMap[obj.id] && itemMap[obj.id][ind.indicatorId]) || ''
+        row.supportMap[ind.indicatorId] = existing
+      }
+      return row
+    })
+    matrixUnsaved.value = false
+  } catch (e) {
+    matrixIndicators.value = []
+    matrixRows.value = []
+  } finally {
+    matrixLoading.value = false
+  }
+}
+
+const saveMatrix = async () => {
+  matrixSaving.value = true
+  try {
+    const items = []
+    for (const row of matrixRows.value) {
+      for (const ind of matrixIndicators.value) {
+        const val = row.supportMap[ind.indicatorId]
+        if (val && ['H', 'M', 'L'].includes(val)) {
+          items.push({ objectiveId: row.objectiveId, indicatorId: ind.indicatorId, supportLevel: val })
+        }
+      }
+    }
+    await request.post(`/teacher/objectives/matrix/${offeringId.value}`, items)
+    ElMessage.success('矩阵保存成功')
+    matrixUnsaved.value = false
+  } catch (e) {
+    ElMessage.error(e.message || '矩阵保存失败')
+  } finally {
+    matrixSaving.value = false
+  }
+}
 
 // ============ 资源 ============
 const resources = ref([])
@@ -255,32 +558,13 @@ const fetchCourseInfo = async () => {
   }
 }
 
-// ============ 加载学生（通过成绩 API） ============
+// ============ 加载学生名单（新 API：四列固定成绩） ============
 const fetchStudents = async () => {
   studentsLoading.value = true
   try {
-    const res = await request.get('/teacher/grades/list', {
-      params: { offeringId: offeringId.value, pageSize: 999 }
-    })
-    if (res.status === 'success' && res.data && res.data.list) {
-      // 按 studentId 分组
-      const studentMap = new Map()
-      res.data.list.forEach(g => {
-        if (!studentMap.has(g.studentId)) {
-          studentMap.set(g.studentId, {
-            studentId: g.studentId,
-            studentName: g.studentName,
-            grades: []
-          })
-        }
-        studentMap.get(g.studentId).grades.push({
-          assessmentId: g.assessmentId,
-          assessmentName: g.assessmentName,
-          score: g.score,
-          gradeId: g.id
-        })
-      })
-      rawStudents.value = Array.from(studentMap.values())
+    const res = await request.get(`/teacher/student-grades/offering/${offeringId.value}`)
+    if (res.status === 'success' && res.data) {
+      rawStudents.value = res.data
     }
   } catch (e) {
     rawStudents.value = []
@@ -289,7 +573,192 @@ const fetchStudents = async () => {
   }
 }
 
-// ============ 考核环节 ============
+// ============ 成绩录入（新 API） ============
+const fetchStudentGrades = async () => {
+  gradesLoading.value = true
+  try {
+    const res = await request.get(`/teacher/student-grades/offering/${offeringId.value}`)
+    if (res.status === 'success' && res.data) {
+      gradeEntryData.value = res.data.map(item => ({
+        studentId: item.studentId,
+        studentNo: item.studentNo,
+        studentName: item.studentName,
+        dailyScore: item.dailyScore,
+        reportScore: item.reportScore,
+        midtermScore: item.midtermScore,
+        finalScore: item.finalScore,
+        editing: false,
+        computedTotal: null
+      }))
+      // 按权重计算每行的最终成绩
+      recalcAllTotals()
+    }
+  } catch (e) {
+    gradeEntryData.value = []
+  } finally {
+    gradesLoading.value = false
+  }
+}
+
+function recalcAllTotals() {
+  gradeEntryData.value.forEach(row => {
+    row.computedTotal = computeRowTotal(row)
+  })
+}
+
+// ============ 权重配置 ============
+const fetchWeights = async () => {
+  try {
+    const res = await request.get(`/teacher/student-grades/weights/${offeringId.value}`)
+    if (res.status === 'success' && res.data) {
+      gradeWeights.value = res.data
+    }
+  } catch (e) {
+    // 使用默认权重
+    gradeWeights.value = { dailyWeight: 0.25, reportWeight: 0.25, midtermWeight: 0.25, finalWeight: 0.25 }
+  }
+}
+
+const openWeightDialog = () => {
+  if (gradeWeights.value) {
+    weightForm.value = {
+      dailyWeight: (gradeWeights.value.dailyWeight * 100),
+      reportWeight: (gradeWeights.value.reportWeight * 100),
+      midtermWeight: (gradeWeights.value.midtermWeight * 100),
+      finalWeight: (gradeWeights.value.finalWeight * 100)
+    }
+  }
+  weightDialogVisible.value = true
+}
+
+const submitWeights = async () => {
+  weightSubmitting.value = true
+  try {
+    await request.post('/teacher/student-grades/weights', {
+      offeringId: Number(offeringId.value),
+      dailyWeight: weightForm.value.dailyWeight / 100,
+      reportWeight: weightForm.value.reportWeight / 100,
+      midtermWeight: weightForm.value.midtermWeight / 100,
+      finalWeight: weightForm.value.finalWeight / 100
+    })
+    ElMessage.success('权重配置已保存')
+    weightDialogVisible.value = false
+    await fetchWeights()
+    // 权重变更后重新计算所有最终成绩
+    recalcAllTotals()
+  } catch (e) {
+    // 拦截器已处理
+  } finally {
+    weightSubmitting.value = false
+  }
+}
+
+const startEditRow = (index) => {
+  gradeEntryData.value[index].editing = true
+}
+
+const finishEditRow = async (index) => {
+  const row = gradeEntryData.value[index]
+  // 编辑完成后立即重新计算该行的最终成绩
+  row.computedTotal = computeRowTotal(row)
+  row.editing = false
+  // 自动提交该行成绩到后端
+  await saveSingleRow(row)
+}
+
+/**
+ * 静默保存单行成绩（不弹提示）
+ */
+const saveSingleRow = async (row) => {
+  try {
+    await request.post('/teacher/student-grades/batch', {
+      offeringId: Number(offeringId.value),
+      grades: [{
+        studentId: row.studentId,
+        dailyScore: row.dailyScore,
+        reportScore: row.reportScore,
+        midtermScore: row.midtermScore,
+        finalScore: row.finalScore
+      }]
+    })
+  } catch (e) {
+    ElMessage.error('成绩保存失败')
+  }
+}
+
+const submitAllGrades = async () => {
+  submittingGrades.value = true
+  try {
+    const grades = gradeEntryData.value.map(row => ({
+      studentId: row.studentId,
+      dailyScore: row.dailyScore,
+      reportScore: row.reportScore,
+      midtermScore: row.midtermScore,
+      finalScore: row.finalScore
+    }))
+
+    await request.post('/teacher/student-grades/batch', {
+      offeringId: Number(offeringId.value),
+      grades
+    })
+    ElMessage.success('全部成绩已保存')
+    // 刷新数据，退出编辑态
+    await fetchStudentGrades()
+  } catch (e) {
+    // 拦截器已处理
+  } finally {
+    submittingGrades.value = false
+  }
+}
+
+const openGradeImport = () => {
+  importDialogVisible.value = true
+}
+
+const handleImportDialogClose = () => {
+  // 清理上传组件
+}
+
+const handleGradeImportSuccess = (response) => {
+  if (response.status === 'success') {
+    ElMessage.success(response.info || '导入成功')
+    importDialogVisible.value = false
+    fetchWeights().then(() => fetchStudentGrades())
+    fetchStudents()
+  } else {
+    ElMessage.error(response.info || '导入失败')
+  }
+}
+
+const handleGradeImportError = () => {
+  ElMessage.error('导入失败，请检查文件格式')
+}
+
+const exportStudentGrades = () => {
+  const token = localStorage.getItem('token')
+  const url = `/api/teacher/student-grades/export/${offeringId.value}`
+  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    .then(res => {
+      if (!res.ok) throw new Error('导出失败')
+      return res.blob()
+    })
+    .then(blob => {
+      const blobUrl = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = `学生成绩表_${offeringId.value}.xlsx`
+      a.click()
+      window.URL.revokeObjectURL(blobUrl)
+      ElMessage.success('导出成功')
+    })
+    .catch(() => ElMessage.error('导出失败'))
+}
+
+const exportStudentList = () => {
+  exportStudentGrades()
+}
+
+// ============ 考核环节（仅用于计数） ============
 const fetchAssessments = async () => {
   try {
     const res = await request.get(`/teacher/assessments/offering/${offeringId.value}`)
@@ -301,50 +770,6 @@ const fetchAssessments = async () => {
   }
 }
 
-// ============ 成绩管理 ============
-const fetchGrades = async () => {
-  if (!selectedAssessmentId.value) return
-  gradesLoading.value = true
-  try {
-    const res = await request.get('/teacher/grades/list', {
-      params: { offeringId: offeringId.value, pageSize: 999 }
-    })
-    if (res.status === 'success' && res.data && res.data.list) {
-      // 筛选当前考核环节的成绩
-      const filtered = res.data.list.filter(g => g.assessmentId === selectedAssessmentId.value)
-      gradeTableData.value = filtered.map(g => ({
-        id: g.id,
-        studentId: g.studentId,
-        studentName: g.studentName,
-        score: g.score,
-        assessmentId: g.assessmentId
-      }))
-    }
-  } catch (e) {
-    gradeTableData.value = []
-  } finally {
-    gradesLoading.value = false
-  }
-}
-
-const saveGrade = async (row) => {
-  try {
-    await request.post('/teacher/grades/save', {
-      id: row.id,
-      assessmentId: row.assessmentId || selectedAssessmentId.value,
-      studentId: row.studentId,
-      score: row.score
-    })
-    ElMessage.success('成绩已保存')
-  } catch (e) {
-    // 已提示
-  }
-}
-
-const exportGrades = () => {
-  ElMessage.info('导出成绩功能待实现')
-}
-
 // ============ 课程目标 ============
 const fetchObjectives = async () => {
   objectivesLoading.value = true
@@ -352,6 +777,8 @@ const fetchObjectives = async () => {
     const res = await request.get(`/teacher/offering/${offeringId.value}/objectives`)
     if (res.status === 'success' && res.data) {
       objectives.value = res.data
+      // 加载课程目标后，同时加载指标点矩阵
+      fetchMatrixData()
     }
   } catch (e) {
     objectives.value = []
@@ -443,9 +870,6 @@ const handleUploadError = () => {
 const downloadResource = (row) => {
   const token = localStorage.getItem('token')
   const url = `/api/teacher/resources/download/${row.id}`
-  const link = document.createElement('a')
-  link.href = url
-  // Use fetch for auth
   fetch(url, { headers: { Authorization: `Bearer ${token}` } })
     .then(res => res.blob())
     .then(blob => {
@@ -479,7 +903,12 @@ const deleteResource = (row) => {
 const handleTabChange = (tab) => {
   switch (tab) {
     case 'students': fetchStudents(); break
-    case 'grades': fetchAssessments(); break
+    case 'grades':
+      fetchWeights().then(() => {
+        fetchStudentGrades().then(() => recalcColumnWidth())
+      })
+      fetchAssessments()
+      break
     case 'objectives': fetchObjectives(); break
     case 'resources': fetchResources(); break
   }
@@ -488,7 +917,19 @@ const handleTabChange = (tab) => {
 // ============ 初始化 ============
 onMounted(() => {
   fetchCourseInfo()
-  fetchStudents()
+  fetchObjectives()
+
+  // 监听窗口大小变化，重新计算列宽
+  resizeObserver = new ResizeObserver(() => recalcColumnWidth())
+  const wrap = gradeTableWrapRef.value
+  if (wrap) resizeObserver.observe(wrap)
+  // 页面resize时也重新计算
+  window.addEventListener('resize', recalcColumnWidth)
+})
+
+onUnmounted(() => {
+  if (resizeObserver) resizeObserver.disconnect()
+  window.removeEventListener('resize', recalcColumnWidth)
 })
 </script>
 
@@ -547,4 +988,75 @@ onMounted(() => {
   align-items: center;
   margin-bottom: 16px;
 }
+
+/* 权重显示 */
+.weight-info {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.weight-tag {
+  padding: 2px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #e6a23c;
+  background: #fdf6ec;
+  border: 1px solid #faecd8;
+}
+
+/* 成绩表格容器 */
+.grade-table-wrap {
+  width: 100%;
+  overflow: hidden;
+}
+
+/* 成绩单元格居中 */
+.score-cell {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+}
+.score-cell.empty {
+  color: #c0c4cc;
+}
+.score-cell.total-score {
+  font-weight: 600;
+  color: #303133;
+}
+
+/* ========== 矩阵样式 ========== */
+.matrix-section { margin-top: 24px; }
+.matrix-section .tab-header {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+}
+.matrix-section .header-left { display: flex; align-items: center; gap: 12px; }
+.matrix-section .tab-title { font-size: 15px; font-weight: 500; color: #303133; }
+
+.obj-label { font-weight: 600; color: #409EFF; font-size: 13px; }
+
+.indicator-header { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.indicator-code { font-weight: 600; color: #303133; font-size: 13px; cursor: help; }
+.indicator-req { font-size: 11px; color: #909399; }
+
+/* 下拉框选中的颜色 */
+:deep(.ss-h .el-input__wrapper) { background-color: #fef0f0 !important; border-color: #f56c6c !important; }
+:deep(.ss-h .el-input__wrapper:hover) { border-color: #f56c6c !important; }
+:deep(.ss-h .el-select__selected-item) { color: #f56c6c !important; font-weight: 700; }
+:deep(.ss-m .el-input__wrapper) { background-color: #fdf6ec !important; border-color: #e6a23c !important; }
+:deep(.ss-m .el-input__wrapper:hover) { border-color: #e6a23c !important; }
+:deep(.ss-m .el-select__selected-item) { color: #e6a23c !important; font-weight: 700; }
+:deep(.ss-l .el-input__wrapper) { background-color: #f0f9eb !important; border-color: #67c23a !important; }
+:deep(.ss-l .el-input__wrapper:hover) { border-color: #67c23a !important; }
+:deep(.ss-l .el-select__selected-item) { color: #67c23a !important; font-weight: 700; }
+:deep(.ss-n .el-input__wrapper) { background-color: #f5f7fa !important; border-color: #dcdfe6 !important; }
+:deep(.ss-n .el-select__selected-item) { color: #c0c4cc !important; }
+
+.so { font-weight: 700; font-size: 14px; }
+.so-h { color: #f56c6c; } .so-m { color: #e6a23c; } .so-l { color: #67c23a; } .so-none { color: #c0c4cc; }
+
+.matrix-legend { margin-top: 12px; padding: 10px 16px; background: #f7f8fa; border-radius: 6px;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; }
+.matrix-legend .legend-title { font-weight: 600; color: #333; }
+.sh { color: #f56c6c; font-weight: 500; } .sm { color: #e6a23c; font-weight: 500; }
+.sl { color: #67c23a; font-weight: 500; } .sn { color: #c0c4cc; font-weight: 500; }
 </style>

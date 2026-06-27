@@ -1,19 +1,12 @@
 package com.certification.backend.service.impl;
 
 import com.certification.backend.dto.request.MatrixItemRequest;
+import com.certification.backend.dto.response.IndicatorInfoResponse;
 import com.certification.backend.dto.response.MatrixItemResponse;
-import com.certification.backend.entity.CourseObjective;
-import com.certification.backend.entity.CourseOffering;
-import com.certification.backend.entity.IndicatorPoint;
-import com.certification.backend.entity.ObjectiveIndicatorMatrix;
-import com.certification.backend.entity.User;
+import com.certification.backend.entity.*;
 import com.certification.backend.enums.ResultCodeEnum;
 import com.certification.backend.exception.BusinessException;
-import com.certification.backend.repository.CourseObjectiveRepository;
-import com.certification.backend.repository.CourseOfferingRepository;
-import com.certification.backend.repository.IndicatorPointRepository;
-import com.certification.backend.repository.ObjectiveIndicatorMatrixRepository;
-import com.certification.backend.repository.UserRepository;
+import com.certification.backend.repository.*;
 import com.certification.backend.service.ObjectiveIndicatorMatrixService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,17 +33,23 @@ public class ObjectiveIndicatorMatrixServiceImpl implements ObjectiveIndicatorMa
     private final CourseOfferingRepository offeringRepository;
     private final IndicatorPointRepository indicatorPointRepository;
     private final UserRepository userRepository;
+    private final CourseRepository courseRepository;
+    private final GraduationRequirementRepository requirementRepository;
 
     public ObjectiveIndicatorMatrixServiceImpl(ObjectiveIndicatorMatrixRepository matrixRepository,
                                                CourseObjectiveRepository objectiveRepository,
                                                CourseOfferingRepository offeringRepository,
                                                IndicatorPointRepository indicatorPointRepository,
-                                               UserRepository userRepository) {
+                                               UserRepository userRepository,
+                                               CourseRepository courseRepository,
+                                               GraduationRequirementRepository requirementRepository) {
         this.matrixRepository = matrixRepository;
         this.objectiveRepository = objectiveRepository;
         this.offeringRepository = offeringRepository;
         this.indicatorPointRepository = indicatorPointRepository;
         this.userRepository = userRepository;
+        this.courseRepository = courseRepository;
+        this.requirementRepository = requirementRepository;
     }
 
     @Override
@@ -150,6 +149,44 @@ public class ObjectiveIndicatorMatrixServiceImpl implements ObjectiveIndicatorMa
         return savedMatrices.stream()
                 .map(m -> toResponse(m, objectiveDescMap, indicatorMap))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<IndicatorInfoResponse> getIndicatorsByOffering(Long offeringId, String username) {
+        CourseOffering offering = getOfferingAndValidateOwner(offeringId, username);
+
+        // offering → course → programId
+        Course course = courseRepository.findById(offering.getCourseId())
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程不存在"));
+        Long programId = course.getProgramId();
+
+        // 获取该专业的所有毕业要求
+        List<GraduationRequirement> requirements = requirementRepository.findByProgramId(programId);
+        if (requirements.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 获取所有指标点
+        List<Long> reqIds = requirements.stream().map(GraduationRequirement::getId).collect(Collectors.toList());
+        List<IndicatorPoint> allIndicators = indicatorPointRepository.findByRequirementIdIn(reqIds);
+        if (allIndicators.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        // 构建 requirementId → requirementCode 映射
+        Map<Long, String> reqCodeMap = requirements.stream()
+                .collect(Collectors.toMap(GraduationRequirement::getId, GraduationRequirement::getCode));
+
+        return allIndicators.stream().map(ip -> {
+            IndicatorInfoResponse resp = new IndicatorInfoResponse();
+            resp.setIndicatorId(ip.getId());
+            resp.setIndicatorCode(ip.getCode());
+            resp.setIndicatorDesc(ip.getDescription());
+            resp.setRequirementId(ip.getRequirementId());
+            resp.setRequirementCode(reqCodeMap.getOrDefault(ip.getRequirementId(), ""));
+            return resp;
+        }).collect(Collectors.toList());
     }
 
     // ==================== 私有方法 ====================

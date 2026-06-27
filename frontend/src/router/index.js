@@ -18,7 +18,9 @@ import ChangePassword from '../views/ChangePassword.vue'
 // ============ 模块二：人才培养方案管理 ============
 import CurriculumManagement from '../views/curriculum/CurriculumManagement.vue'
 import ProgramDetail from '../views/curriculum/ProgramDetail.vue'
-// 旧路由（后续可删除）
+// 教师/学生端只读查看
+import CurriculumView from '../views/curriculum/CurriculumView.vue'
+import ProgramView from '../views/curriculum/ProgramView.vue'
 
 
 const router = createRouter({
@@ -167,7 +169,7 @@ const router = createRouter({
 
         // ============ 模块二：人才培养方案管理（仅管理员） ============
 
-        // ----- 【新增】专业详情页（包含 Tab：培养目标、毕业要求、支撑矩阵） -----
+        // ----- 【管理员】专业详情页（包含 Tab：培养目标、毕业要求、支撑矩阵） -----
         {
           path: '/curriculum/detail/:id',
           name: 'ProgramDetail',
@@ -179,7 +181,7 @@ const router = createRouter({
           }
         },
 
-        // ----- 专业管理（列表页） -----
+        // ----- 【管理员】专业管理（列表页） -----
         {
           path: '/curriculum/management',
           name: 'CurriculumManagement',
@@ -188,6 +190,32 @@ const router = createRouter({
             title: '专业管理',
             icon: 'DocumentCopy',
             roles: ['admin']
+          }
+        },
+
+        // ============ 模块二-查看：人才培养方案查看（教师/学生只读） ============
+
+        // ----- 【教师/学生】专业详情查看页 -----
+        {
+          path: '/curriculum/view/:id',
+          name: 'ProgramView',
+          component: ProgramView,
+          meta: {
+            title: '专业详情',
+            icon: 'DocumentCopy',
+            roles: ['teacher', 'student']
+          }
+        },
+
+        // ----- 【教师/学生】人才培养方案查看列表 -----
+        {
+          path: '/curriculum/view',
+          name: 'CurriculumView',
+          component: CurriculumView,
+          meta: {
+            title: '人才培养方案',
+            icon: 'DocumentCopy',
+            roles: ['teacher', 'student']
           }
         },
 

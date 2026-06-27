@@ -67,9 +67,18 @@
 
         <el-tab-pane label="成绩明细" name="grades">
           <div class="grades-content" v-loading="gradeLoading">
-            <el-table :data="myGrades" border v-if="myGrades.length">
-              <el-table-column prop="assessmentName" label="考核项目" />
-              <el-table-column prop="score" label="成绩" width="120" />
+            <el-table :data="gradeTableData" border v-if="myGrade">
+              <el-table-column label="考核项目" width="150">
+                <template #default="scope">{{ scope.row.label }}</template>
+              </el-table-column>
+              <el-table-column label="成绩" width="120" align="center">
+                <template #default="scope">
+                  <span v-if="scope.row.value != null" :style="scope.row.label === '最终成绩' ? 'font-weight:600' : ''">
+                    {{ scope.row.value }}
+                  </span>
+                  <span v-else style="color: #999">-</span>
+                </template>
+              </el-table-column>
             </el-table>
             <el-empty v-else description="暂无成绩" />
           </div>
@@ -80,7 +89,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import request from '@/api/request'
@@ -107,7 +116,17 @@ const courseInfo = ref({
 
 const objectives = ref([])
 const resources = ref([])
-const myGrades = ref([])
+const myGrade = ref(null)
+const gradeTableData = computed(() => {
+  if (!myGrade.value) return []
+  return [
+    { label: '平时成绩', value: myGrade.value.dailyScore },
+    { label: '实验报告', value: myGrade.value.reportScore },
+    { label: '期中考试', value: myGrade.value.midtermScore },
+    { label: '期末考试', value: myGrade.value.finalScore },
+    { label: '最终成绩', value: myGrade.value.totalScore },
+  ]
+})
 
 // 从学生课程列表中找到对应课程信息，并获取详情
 const loadCourseInfo = async () => {
@@ -137,7 +156,7 @@ const loadCourseInfo = async () => {
 const loadObjectives = async (offeringId) => {
   objLoading.value = true
   try {
-    const res = await request.get(`/teacher/offering/${offeringId}/objectives`)
+    const res = await request.get(`/student/objectives/${offeringId}`)
     if (res.status === 'success' && res.data) {
       objectives.value = res.data
     }
@@ -165,20 +184,12 @@ const loadResources = async (offeringId) => {
 const loadMyGrades = async (offeringId) => {
   gradeLoading.value = true
   try {
-    const res = await request.get('/teacher/grades/list', {
-      params: { offeringId, pageSize: 999 }
-    })
-    if (res.status === 'success' && res.data && res.data.list) {
-      // 筛选当前学生的成绩（从 localStorage 获取 username）
-      const username = localStorage.getItem('username')
-      const userGrades = res.data.list.filter(g => g.studentName === username || g.studentId === username)
-      myGrades.value = userGrades.map(g => ({
-        assessmentName: g.assessmentName,
-        score: g.score
-      }))
+    const res = await request.get(`/student/grades/${offeringId}`)
+    if (res.status === 'success' && res.data) {
+      myGrade.value = res.data
     }
   } catch (e) {
-    myGrades.value = []
+    myGrade.value = null
   } finally {
     gradeLoading.value = false
   }
