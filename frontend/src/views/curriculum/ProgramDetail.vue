@@ -62,17 +62,30 @@
               @change="handleDataChange"
           />
         </el-tab-pane>
-        <el-tab-pane label="支撑矩阵" name="matrix">
-          <!-- 使用 programId 作为 key 的一部分，切换专业时强制重建 -->
-          <MatrixTab
-              v-if="activeTab === 'matrix'"
-              :key="`matrix-${programId}`"
-              ref="matrixRef"
+        <!-- 培养目标-毕业要求矩阵 -->
+        <el-tab-pane label="目标-要求矩阵" name="objectiveMatrix">
+          <ObjectiveMatrixTab
+              v-if="activeTab === 'objectiveMatrix'"
+              :key="`objectiveMatrix-${programId}`"
+              ref="objectiveMatrixRef"
               :program-id="programId"
               :disabled="programStatus === 'published'"
               @change="handleDataChange"
               @tab-change="switchTab"
-              @unsaved-change="handleMatrixUnsavedChange"
+              @unsaved-change="handleObjectiveMatrixUnsavedChange"
+          />
+        </el-tab-pane>
+        <!-- 课程-毕业要求矩阵 -->
+        <el-tab-pane label="课程-要求矩阵" name="courseMatrix">
+          <CourseMatrixTab
+              v-if="activeTab === 'courseMatrix'"
+              :key="`courseMatrix-${programId}`"
+              ref="courseMatrixRef"
+              :program-id="programId"
+              :disabled="programStatus === 'published'"
+              @change="handleDataChange"
+              @tab-change="switchTab"
+              @unsaved-change="handleCourseMatrixUnsavedChange"
           />
         </el-tab-pane>
       </el-tabs>
@@ -89,7 +102,8 @@ import request from '@/api/request'
 import GoalsTab from './components/GoalsTab.vue'
 import RequirementsTab from './components/RequirementsTab.vue'
 import CoursesTab from './components/CoursesTab.vue'
-import MatrixTab from './components/MatrixTab.vue'
+import ObjectiveMatrixTab from './components/ObjectiveMatrixTab.vue'  // 原 MatrixTab 改名
+import CourseMatrixTab from './components/CourseMatrixTab.vue'        // 新增
 
 defineOptions({
   name: 'ProgramDetail'
@@ -107,13 +121,15 @@ const programStatus = ref('draft')
 // ============ Tab 状态 ============
 const activeTab = ref('goals')
 const coursesKey = ref(0)
-const hasMatrixUnsavedChanges = ref(false)
+const hasObjectiveMatrixUnsavedChanges = ref(false)
+const hasCourseMatrixUnsavedChanges = ref(false)
 
 // ============ 组件引用 ============
 const goalsRef = ref(null)
 const requirementsRef = ref(null)
 const coursesRef = ref(null)
-const matrixRef = ref(null)
+const objectiveMatrixRef = ref(null)
+const courseMatrixRef = ref(null)
 
 // ============ 方法 ============
 
@@ -122,9 +138,19 @@ const switchTab = (tabName) => {
   activeTab.value = tabName
 }
 
-// 处理矩阵未保存状态变化
-const handleMatrixUnsavedChange = (hasUnsaved) => {
-  hasMatrixUnsavedChanges.value = hasUnsaved
+// 处理培养目标-毕业要求矩阵未保存状态变化
+const handleObjectiveMatrixUnsavedChange = (hasUnsaved) => {
+  hasObjectiveMatrixUnsavedChanges.value = hasUnsaved
+}
+
+// 处理课程-毕业要求矩阵未保存状态变化
+const handleCourseMatrixUnsavedChange = (hasUnsaved) => {
+  hasCourseMatrixUnsavedChanges.value = hasUnsaved
+}
+
+// 检查是否有任何未保存的矩阵
+const hasAnyUnsavedChanges = () => {
+  return hasObjectiveMatrixUnsavedChanges.value || hasCourseMatrixUnsavedChanges.value
 }
 
 // Tab 切换
@@ -154,9 +180,9 @@ const loadProgramInfo = async () => {
 
 // ============ 返回列表页 ============
 const goBack = () => {
-  if (hasMatrixUnsavedChanges.value) {
+  if (hasAnyUnsavedChanges()) {
     ElMessageBox.confirm(
-        '矩阵数据有未保存的更改，离开后将丢失，确定要离开吗？',
+        '有矩阵数据未保存的更改，离开后将丢失，确定要离开吗？',
         '提示',
         {
           confirmButtonText: '确定离开',
@@ -178,9 +204,14 @@ const handleDataChange = () => {
 
 // ============ 发布 / 取消发布 ============
 const handlePublish = async () => {
-  if (hasMatrixUnsavedChanges.value) {
-    ElMessage.warning('请先保存矩阵数据再发布')
-    activeTab.value = 'matrix'
+  if (hasAnyUnsavedChanges()) {
+    ElMessage.warning('请先保存所有矩阵数据再发布')
+    // 跳转到有未保存更改的矩阵 tab
+    if (hasObjectiveMatrixUnsavedChanges.value) {
+      activeTab.value = 'objectiveMatrix'
+    } else if (hasCourseMatrixUnsavedChanges.value) {
+      activeTab.value = 'courseMatrix'
+    }
     return
   }
 
@@ -208,18 +239,14 @@ watch(() => route.params.id, (newId) => {
   if (newId) {
     programId.value = newId
     loadProgramInfo()
-    // 切换到矩阵tab时，key会自动变化触发重建
-    if (activeTab.value === 'matrix') {
-      // 因为 key 使用了 programId，组件会自动重建
-    }
   }
 }, { immediate: true })
 
 // ============ 页面离开前提示 ============
 const handleBeforeUnload = (e) => {
-  if (hasMatrixUnsavedChanges.value) {
+  if (hasAnyUnsavedChanges()) {
     e.preventDefault()
-    e.returnValue = '矩阵数据有未保存的更改，确定要离开吗？'
+    e.returnValue = '有矩阵数据未保存的更改，确定要离开吗？'
   }
 }
 
@@ -269,7 +296,6 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-/* ========== 滚动条美化 ========== */
 :deep(.el-card__body) {
   padding: 10px 20px 20px 20px;
 }
