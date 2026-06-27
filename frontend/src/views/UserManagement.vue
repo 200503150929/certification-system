@@ -393,7 +393,7 @@ onMounted(() => {
 
 <style scoped>
 .user-management-container {
-  padding: 20px;
+  padding: 10px;
   width: 100%;
   box-sizing: border-box;
 }

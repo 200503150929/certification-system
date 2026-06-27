@@ -98,7 +98,7 @@ onMounted(() => {
 
 <style scoped>
 .role-management-container {
-  padding: 20px;
+  padding: 10px;
 }
 .card-header {
   display: flex;

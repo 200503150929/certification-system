@@ -56,15 +56,17 @@
           <span>人才培养方案管理</span>
         </el-menu-item>
 
-        <!-- 角色权限（仅管理员可见） -->
-        <el-sub-menu v-if="userRole === 'admin'" index="roles">
-          <template #title>
-            <el-icon><Connection /></el-icon>
-            <span>角色权限</span>
-          </template>
-          <el-menu-item index="/roles">角色权限管理</el-menu-item>
-          <el-menu-item index="/users">用户管理</el-menu-item>
-        </el-sub-menu>
+        <!-- 用户管理（独立菜单，仅管理员可见） -->
+        <el-menu-item v-if="userRole === 'admin'" index="/users">
+          <el-icon><User /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+
+        <!-- 角色权限管理（独立菜单，仅管理员可见） -->
+        <el-menu-item v-if="userRole === 'admin'" index="/roles">
+          <el-icon><Connection /></el-icon>
+          <span>角色权限管理</span>
+        </el-menu-item>
 
       </el-menu>
 
@@ -531,7 +533,7 @@ onMounted(() => {
 /* ========== 主内容 ========== */
 .el-main {
   background-color: #f0f2f5;
-  padding: 20px;
+  padding: 10px;
   overflow-y: auto;
   flex: 1;
 }

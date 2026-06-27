@@ -7,7 +7,7 @@
           <el-icon><Warning /></el-icon>
           未保存
         </el-tag>
-        <span v-if="hasUnsavedChanges" class="unsaved-tip">有未保存的更改，请点击「保存矩阵」</span>
+        <span v-if="hasUnsavedChanges" class="unsaved-tip">有未保存的更改，如需保存请点击「保存矩阵」</span>
       </div>
       <el-button
           type="primary"
@@ -21,86 +21,88 @@
     </div>
 
     <div class="matrix-container" v-loading="loading">
-      <!-- 提示信息 -->
-      <el-alert
-          v-if="objectives.length === 0 || requirements.length === 0"
-          type="warning"
-          :closable="false"
-          show-icon
-      >
-        <template v-if="objectives.length === 0 && requirements.length === 0">
-          请先配置<a href="javascript:;" @click="$emit('tabChange', 'goals')">培养目标</a>和
-          <a href="javascript:;" @click="$emit('tabChange', 'requirements')">毕业要求</a>
-        </template>
-        <template v-else-if="objectives.length === 0">
-          请先配置<a href="javascript:;" @click="$emit('tabChange', 'goals')">培养目标</a>
-        </template>
-        <template v-else-if="requirements.length === 0">
-          请先配置<a href="javascript:;" @click="$emit('tabChange', 'requirements')">毕业要求</a>
-        </template>
-      </el-alert>
-
-      <!-- 矩阵表格 -->
-      <el-table
-          v-if="requirements.length > 0 && objectives.length > 0"
-          :data="matrixData"
-          border
-          style="width: 100%; margin-top: 16px"
-      >
-        <el-table-column prop="description" label="培养目标 / 毕业要求" width="240" fixed>
-          <template #default="scope">
-            <span class="objective-label">{{ scope.row.description }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-            v-for="req in requirements"
-            :key="req.id"
-            :label="req.code"
-            width="120"
-            align="center"
-        >
-          <template #default="scope">
-            <el-select
-                v-model="scope.row.supportMap[req.id]"
-                placeholder="-"
-                size="small"
-                style="width: 80px"
-                @change="onSupportChange"
-                :disabled="disabled"
-                :class="getSelectClass(scope.row.supportMap[req.id])"
-            >
-              <el-option value="H">
-                <span class="support-option support-strong">H</span>
-              </el-option>
-              <el-option value="M">
-                <span class="support-option support-medium">M</span>
-              </el-option>
-              <el-option value="L">
-                <span class="support-option support-weak">L</span>
-              </el-option>
-              <el-option value="">
-                <span class="support-option support-none">-</span>
-              </el-option>
-            </el-select>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 图例 -->
-      <div class="matrix-legend" v-if="requirements.length > 0 && objectives.length > 0">
-        <span class="legend-title">支撑强度图例：</span>
-        <span class="legend-item support-strong">■ H（强支撑）</span>
-        <span class="legend-item support-medium">■ M（中支撑）</span>
-        <span class="legend-item support-weak">■ L（弱支撑）</span>
-        <span class="legend-item support-none">■ -（无支撑）</span>
-        <span class="legend-tip">（在表格下拉框中选择）</span>
+      <!-- 加载中状态 -->
+      <div v-if="loading" style="min-height: 200px; display: flex; align-items: center; justify-content: center;">
+        <span style="color: #909399;">加载矩阵数据...</span>
       </div>
 
-      <!-- 空状态 -->
-      <el-empty
-          v-if="!loading && (objectives.length === 0 || requirements.length === 0)"
-          :description="emptyText"
-      />
+      <!-- 数据加载完成后的内容 -->
+      <template v-else>
+        <!-- 提示信息 -->
+        <el-alert
+            v-if="objectives.length === 0 || requirements.length === 0"
+            type="warning"
+            :closable="false"
+            show-icon
+        >
+          <template v-if="objectives.length === 0 && requirements.length === 0">
+            请先配置<a href="javascript:;" @click="$emit('tabChange', 'goals')">培养目标</a>和
+            <a href="javascript:;" @click="$emit('tabChange', 'requirements')">毕业要求</a>
+          </template>
+          <template v-else-if="objectives.length === 0">
+            请先配置<a href="javascript:;" @click="$emit('tabChange', 'goals')">培养目标</a>
+          </template>
+          <template v-else-if="requirements.length === 0">
+            请先配置<a href="javascript:;" @click="$emit('tabChange', 'requirements')">毕业要求</a>
+          </template>
+        </el-alert>
+
+        <!-- 矩阵表格 -->
+        <el-table
+            v-if="requirements.length > 0 && objectives.length > 0"
+            :data="matrixData"
+            border
+            style="width: 100%; margin-top: 16px"
+        >
+          <el-table-column prop="description" label="培养目标 / 毕业要求" width="240" fixed>
+            <template #default="scope">
+              <span class="objective-label">{{ scope.row.description }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column
+              v-for="req in requirements"
+              :key="req.id"
+              :label="req.code"
+              width="120"
+              align="center"
+          >
+            <template #default="scope">
+              <el-select
+                  v-model="scope.row.supportMap[req.id]"
+                  placeholder="-"
+                  size="small"
+                  style="width: 80px"
+                  @change="onSupportChange"
+                  :disabled="disabled"
+                  :class="getSelectClass(scope.row.supportMap[req.id])"
+              >
+                <el-option value="H">
+                  <span class="support-option support-strong">H</span>
+                </el-option>
+                <el-option value="M">
+                  <span class="support-option support-medium">M</span>
+                </el-option>
+                <el-option value="L">
+                  <span class="support-option support-weak">L</span>
+                </el-option>
+                <el-option value="">
+                  <span class="support-option support-none">-</span>
+                </el-option>
+              </el-select>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- 图例 -->
+        <div class="matrix-legend" v-if="requirements.length > 0 && objectives.length > 0">
+          <span class="legend-title">支撑强度图例：</span>
+          <span class="legend-item support-strong">■ H（强支撑）</span>
+          <span class="legend-item support-medium">■ M（中支撑）</span>
+          <span class="legend-item support-weak">■ L（弱支撑）</span>
+          <span class="legend-item support-none">■ -（无支撑）</span>
+          <span class="legend-tip">（在表格下拉框中选择）</span>
+        </div>
+      </template>
     </div>
   </div>
 </template>
@@ -130,6 +132,7 @@ const matrixData = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const hasUnsavedChanges = ref(false)
+const isInitialLoad = ref(true) // 标记是否为初始加载
 
 const emptyText = ref('')
 
@@ -176,7 +179,11 @@ const onSupportChange = () => {
 // 加载所有数据
 const loadData = async () => {
   if (!props.programId) return
+
+  // 先设置加载状态，但不重置 objectives 和 requirements
+  // 这样在加载过程中不会闪烁提示
   loading.value = true
+
   try {
     // 并行加载目标和毕业要求
     const [objRes, reqRes] = await Promise.all([
@@ -249,6 +256,8 @@ const loadData = async () => {
       originalDataSnapshot = ''
       hasUnsavedChanges.value = false
     }
+
+    isInitialLoad.value = false
   } catch (e) {
     ElMessage.error(e.message || '加载矩阵数据失败')
   } finally {
