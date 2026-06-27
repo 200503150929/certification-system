@@ -132,7 +132,7 @@ const matrixData = ref([])
 const loading = ref(false)
 const saving = ref(false)
 const hasUnsavedChanges = ref(false)
-const isInitialLoad = ref(true) // 标记是否为初始加载
+const isInitialLoad = ref(true)
 
 const emptyText = ref('')
 
@@ -141,6 +141,7 @@ let originalDataSnapshot = ''
 
 // 生成数据快照
 const createSnapshot = (data) => {
+  if (!data || data.length === 0) return ''
   return JSON.stringify(data.map(row => ({
     id: row.id,
     supportMap: row.supportMap
@@ -160,6 +161,12 @@ const getSelectClass = (value) => {
 
 // 检查是否有未保存的更改
 const checkUnsavedChanges = () => {
+  // 如果已发布，不允许修改，直接返回 false
+  if (props.disabled) {
+    hasUnsavedChanges.value = false
+    return
+  }
+
   if (matrixData.value.length === 0) {
     hasUnsavedChanges.value = false
     return
@@ -180,8 +187,16 @@ const onSupportChange = () => {
 const loadData = async () => {
   if (!props.programId) return
 
-  // 先设置加载状态，但不重置 objectives 和 requirements
-  // 这样在加载过程中不会闪烁提示
+  // 重置所有状态
+  hasUnsavedChanges.value = false
+  originalDataSnapshot = ''
+  matrixData.value = []
+  objectives.value = []
+  requirements.value = []
+
+  // 通知父组件未保存状态为 false
+  emit('unsaved-change', false)
+
   loading.value = true
 
   try {
@@ -230,17 +245,13 @@ const loadData = async () => {
         for (const req of requirements.value) {
           row.supportMap[req.id] = ''
         }
-        // 填充已有的支撑关系（将数据库中的中文映射为英文缩写）
+        // 填充已有的支撑关系（数据库直接存的是 H/M/L，无需转换）
         const existingItems = matrixMap[obj.id] || []
         for (const item of existingItems) {
           const supportLevel = item.supportLevel || ''
-          // 将中文映射为英文缩写
-          if (supportLevel === '强') {
-            row.supportMap[item.requirementId] = 'H'
-          } else if (supportLevel === '中') {
-            row.supportMap[item.requirementId] = 'M'
-          } else if (supportLevel === '弱') {
-            row.supportMap[item.requirementId] = 'L'
+          // 直接使用数据库中的值，支持 H/M/L
+          if (supportLevel === 'H' || supportLevel === 'M' || supportLevel === 'L') {
+            row.supportMap[item.requirementId] = supportLevel
           } else {
             row.supportMap[item.requirementId] = ''
           }
@@ -250,11 +261,14 @@ const loadData = async () => {
 
       // 保存初始快照
       originalDataSnapshot = createSnapshot(matrixData.value)
+      // 确保未保存状态为 false
       hasUnsavedChanges.value = false
+      emit('unsaved-change', false)
     } else {
       matrixData.value = []
       originalDataSnapshot = ''
       hasUnsavedChanges.value = false
+      emit('unsaved-change', false)
     }
 
     isInitialLoad.value = false
@@ -278,21 +292,14 @@ const handleSaveAll = async () => {
 
   saving.value = true
   try {
-    let savedCount = 0
     for (const row of matrixData.value) {
       const items = []
       for (const req of requirements.value) {
         const supportLevel = row.supportMap[req.id]
         if (supportLevel) {
-          // 将英文缩写映射回中文保存到数据库
-          let levelMap = {
-            'H': '强',
-            'M': '中',
-            'L': '弱'
-          }
           items.push({
             requirementId: req.id,
-            supportLevel: levelMap[supportLevel] || supportLevel
+            supportLevel: supportLevel // 直接存 H/M/L，无需转换
           })
         }
       }
@@ -300,7 +307,6 @@ const handleSaveAll = async () => {
         objectiveId: row.id,
         items: items
       })
-      savedCount++
     }
 
     // 更新快照，清除未保存状态
@@ -308,7 +314,7 @@ const handleSaveAll = async () => {
     hasUnsavedChanges.value = false
     emit('unsaved-change', false)
 
-    ElMessage.success(`矩阵保存成功`)
+    ElMessage.success('矩阵保存成功')
     emit('change')
   } catch (e) {
     ElMessage.error(e.message || '矩阵保存失败')
@@ -340,8 +346,19 @@ const checkBeforeLeave = () => {
 
 // 监听 programId 变化重新加载
 watch(() => props.programId, () => {
+  // 重置未保存状态
+  hasUnsavedChanges.value = false
+  emit('unsaved-change', false)
   loadData()
 }, { immediate: true })
+
+// 监听 disabled 变化，当变为 true（已发布）时重置未保存状态
+watch(() => props.disabled, (newVal) => {
+  if (newVal) {
+    hasUnsavedChanges.value = false
+    emit('unsaved-change', false)
+  }
+})
 
 onMounted(() => {
   loadData()
@@ -361,6 +378,7 @@ defineExpose({
   hasUnsavedChanges
 })
 </script>
+
 
 <style scoped>
 .matrix-tab {
