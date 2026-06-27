@@ -13,11 +13,11 @@
       <!-- 搜索栏 -->
       <div class="search-bar">
         <el-input
-          v-model="searchName"
-          placeholder="搜索专业名称"
-          clearable
-          style="width: 240px"
-          @keyup.enter="handleSearch"
+            v-model="searchName"
+            placeholder="搜索专业名称"
+            clearable
+            style="width: 240px"
+            @keyup.enter="handleSearch"
         />
         <el-select v-model="searchStatus" placeholder="状态筛选" clearable style="width: 140px; margin-left: 12px">
           <el-option label="已发布" value="published" />
@@ -42,23 +42,20 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="180" />
-        <el-table-column label="操作" width="360" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" @click="goToGoals(scope.row)">培养目标</el-button>
-            <el-button link type="primary" @click="goToRequirements(scope.row)">毕业要求</el-button>
-            <el-button link type="primary" @click="goToMatrix(scope.row)">支撑矩阵</el-button>
-            <el-button link type="primary" @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button link type="primary" @click="goToDetail(scope.row)">编辑</el-button>
             <el-button
-              v-if="scope.row.status === 'draft'"
-              link type="success"
-              @click="handlePublish(scope.row.id)"
+                v-if="scope.row.status === 'draft'"
+                link type="success"
+                @click="handlePublish(scope.row.id)"
             >
               发布
             </el-button>
             <el-button
-              v-if="scope.row.status === 'published'"
-              link type="warning"
-              @click="handleUnpublish(scope.row.id)"
+                v-if="scope.row.status === 'published'"
+                link type="warning"
+                @click="handleUnpublish(scope.row.id)"
             >
               取消发布
             </el-button>
@@ -70,23 +67,23 @@
       <!-- 分页 -->
       <div class="pagination-wrap" v-if="total > 0">
         <el-pagination
-          v-model:current-page="page"
-          v-model:page-size="pageSize"
-          :total="total"
-          :page-sizes="[10, 20, 50]"
-          layout="total, sizes, prev, pager, next"
-          @size-change="loadPrograms"
-          @current-change="loadPrograms"
+            v-model:current-page="page"
+            v-model:page-size="pageSize"
+            :total="total"
+            :page-sizes="[5, 10, 20]"
+            layout="total, sizes, prev, pager, next"
+            @size-change="loadPrograms"
+            @current-change="loadPrograms"
         />
       </div>
     </el-card>
 
     <!-- 新增/编辑专业弹窗 -->
     <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="500px"
-      @close="resetForm"
+        v-model="dialogVisible"
+        :title="dialogTitle"
+        width="500px"
+        @close="resetForm"
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="100px">
         <el-form-item label="专业名称" prop="majorName">
@@ -116,6 +113,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import request from '@/api/request'
+
+defineOptions({
+  name: 'CurriculumManagement'
+})
 
 const router = useRouter()
 
@@ -150,13 +151,13 @@ const loadPrograms = async () => {
   loading.value = true
   try {
     const params = {
-      page: page.value,
+      pageNum: page.value,
       pageSize: pageSize.value
     }
     if (searchName.value) params.majorNameFuzzy = searchName.value
     if (searchStatus.value) params.status = searchStatus.value
     const res = await request.get('/admin/program/list', { params })
-    programList.value = res.data?.records || []
+    programList.value = res.data?.list || []
     total.value = res.data?.total || 0
   } catch (e) {
     ElMessage.error(e.message || '加载专业列表失败')
@@ -168,6 +169,13 @@ const loadPrograms = async () => {
 const handleSearch = () => {
   page.value = 1
   loadPrograms()
+}
+
+// 跳转到专业详情页
+const goToDetail = (row) => {
+  router.push({
+    path: `/curriculum/detail/${row.id}`
+  })
 }
 
 const handleAdd = () => {
@@ -258,18 +266,6 @@ const resetForm = () => {
   formRef.value?.resetFields()
   isEdit.value = false
   editId.value = ''
-}
-
-const goToGoals = (row) => {
-  router.push({ path: '/curriculum/goals', query: { programId: row.id } })
-}
-
-const goToRequirements = (row) => {
-  router.push({ path: '/curriculum/requirements', query: { programId: row.id } })
-}
-
-const goToMatrix = (row) => {
-  router.push({ path: '/curriculum/matrix', query: { programId: row.id } })
 }
 
 onMounted(() => {

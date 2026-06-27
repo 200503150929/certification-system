@@ -5,7 +5,20 @@
         <div class="card-header">
           <span>用户账号管理</span>
           <div>
-            <el-input v-model="searchKeyword" placeholder="搜索工号/姓名" class="search-input" @keyup.enter="handleSearch" clearable />
+            <el-input
+                v-model="searchUsername"
+                placeholder="搜索工号"
+                class="search-input"
+                clearable
+                @keyup.enter="handleSearch"
+            />
+            <el-input
+                v-model="searchName"
+                placeholder="搜索姓名"
+                class="search-input"
+                clearable
+                @keyup.enter="handleSearch"
+            />
             <el-select v-model="selectedRole" placeholder="角色类别" clearable class="role-select" @change="handleSearch">
               <el-option label="管理员" value="admin" />
               <el-option label="教师" value="teacher" />
@@ -48,24 +61,24 @@
 
       <div class="pagination-container">
         <el-pagination
-          background
-          layout="total, prev, pager, next, sizes"
-          :total="total"
-          :page-size="pageSize"
-          :current-page="pageNum"
-          :page-sizes="[10, 20, 50]"
-          @size-change="handleSizeChange"
-          @current-change="handlePageChange"
+            background
+            layout="total, prev, pager, next, sizes"
+            :total="total"
+            :page-size="pageSize"
+            :current-page="pageNum"
+            :page-sizes="[10, 20, 50]"
+            @size-change="handleSizeChange"
+            @current-change="handlePageChange"
         ></el-pagination>
       </div>
     </el-card>
 
     <!-- 新增/编辑弹窗 -->
     <el-dialog
-      v-model="addDialogVisible"
-      :title="dialogTitle"
-      width="520px"
-      @close="resetAddForm"
+        v-model="addDialogVisible"
+        :title="dialogTitle"
+        width="520px"
+        @close="resetAddForm"
     >
       <el-form ref="addFormRef" :model="addForm" :rules="addRules" label-width="90px">
         <el-form-item label="用户名" prop="username">
@@ -106,13 +119,13 @@
     <!-- 批量导入弹窗 -->
     <el-dialog v-model="importVisible" title="批量导入用户" width="450px">
       <el-upload
-        ref="uploadRef"
-        drag
-        :action="`/api/admin/users/import`"
-        :headers="uploadHeaders"
-        :on-success="handleImportSuccess"
-        :on-error="handleImportError"
-        accept=".xlsx,.xls"
+          ref="uploadRef"
+          drag
+          :action="`/api/admin/users/import`"
+          :headers="uploadHeaders"
+          :on-success="handleImportSuccess"
+          :on-error="handleImportError"
+          accept=".xlsx,.xls"
       >
         <el-icon><UploadFilled /></el-icon>
         <div class="el-upload__text">将 Excel 文件拖到此处，或<em>点击上传</em></div>
@@ -125,16 +138,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { Plus, Upload, Edit, Delete, Refresh, UploadFilled } from '@element-plus/icons-vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import {computed, onMounted, reactive, ref, watch} from 'vue'
+import {useRoute} from 'vue-router'
+import {Plus, Upload, Edit, Delete, Refresh, UploadFilled} from '@element-plus/icons-vue'
+import {ElMessage, ElMessageBox} from 'element-plus'
 import request from '@/api/request'
 
 const route = useRoute()
 
 // ============ 搜索筛选 ============
-const searchKeyword = ref('')
+const searchUsername = ref('')   // 工号搜索
+const searchName = ref('')       // 姓名搜索
 const selectedRole = ref('')
 const selectedStatus = ref(null)
 const loading = ref(false)
@@ -168,11 +182,11 @@ const addForm = reactive({
 
 const addRules = {
   username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_]{3,12}$/, message: '3-12位字母、数字或下划线', trigger: 'blur' }
+    {required: true, message: '请输入用户名', trigger: 'blur'},
+    {pattern: /^[a-zA-Z0-9_]{3,12}$/, message: '3-12位字母、数字或下划线', trigger: 'blur'}
   ],
-  name: [{ required: true, message: '请输入姓名', trigger: 'blur' }],
-  role: [{ required: true, message: '请选择角色', trigger: 'change' }]
+  name: [{required: true, message: '请输入姓名', trigger: 'blur'}],
+  role: [{required: true, message: '请选择角色', trigger: 'change'}]
 }
 
 // ============ 计算属性 ============
@@ -185,7 +199,7 @@ const uploadHeaders = computed(() => ({
 
 // ============ 工具方法 ============
 const getRoleLabel = (role) => {
-  const map = { admin: '管理员', teacher: '教师', student: '学生' }
+  const map = {admin: '管理员', teacher: '教师', student: '学生'}
   return map[role] || role
 }
 
@@ -204,15 +218,12 @@ const fetchUsers = async () => {
       pageNum: pageNum.value,
       pageSize: pageSize.value
     }
-    if (searchKeyword.value) {
-      // 同时作为 usernameFuzzy 和 nameFuzzy 搜索
-      params.usernameFuzzy = searchKeyword.value
-      params.nameFuzzy = searchKeyword.value
-    }
+    if (searchUsername.value) params.usernameFuzzy = searchUsername.value
+    if (searchName.value) params.nameFuzzy = searchName.value
     if (selectedRole.value) params.role = selectedRole.value
     if (selectedStatus.value !== null && selectedStatus.value !== '') params.status = selectedStatus.value
 
-    const res = await request.get('/admin/users/list', { params })
+    const res = await request.get('/admin/users/list', {params})
     if (res.status === 'success' && res.data) {
       tableData.value = res.data.list || []
       total.value = res.data.total || 0
@@ -246,6 +257,7 @@ const handleSizeChange = (size) => {
 const openAddDialog = () => {
   isEdit.value = false
   editingId.value = null
+  resetAddForm()
   addDialogVisible.value = true
 }
 
@@ -307,7 +319,8 @@ const handleDelete = (row) => {
     } catch (e) {
       // 拦截器已处理
     }
-  }).catch(() => {})
+  }).catch(() => {
+  })
 }
 
 const handleResetPassword = (row) => {
@@ -319,10 +332,12 @@ const handleResetPassword = (row) => {
     try {
       await request.put(`/admin/users/reset-password/${row.id}`)
       ElMessage.success('密码已重置为 123456')
+      fetchUsers()
     } catch (e) {
       // 拦截器已处理
     }
-  }).catch(() => {})
+  }).catch(() => {
+  })
 }
 
 const resetAddForm = () => {
@@ -362,6 +377,10 @@ const applyRoleQuery = () => {
   const role = route.query.role
   const validRoles = ['admin', 'teacher', 'student']
   selectedRole.value = validRoles.includes(role) ? role : ''
+  // 清空搜索条件
+  searchUsername.value = ''
+  searchName.value = ''
+  selectedStatus.value = null
   fetchUsers()
 }
 
@@ -378,6 +397,7 @@ onMounted(() => {
   width: 100%;
   box-sizing: border-box;
 }
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -385,14 +405,17 @@ onMounted(() => {
   flex-wrap: wrap;
   gap: 10px;
 }
+
 .search-input {
-  width: 200px;
+  width: 150px;
   margin-right: 10px;
 }
+
 .role-select {
   width: 120px;
   margin-right: 10px;
 }
+
 .pagination-container {
   display: flex;
   justify-content: flex-end;
@@ -422,6 +445,7 @@ onMounted(() => {
 :deep(.el-table) {
   border: none !important;
 }
+
 :deep(.el-table__inner-wrapper) {
   border: none !important;
 }

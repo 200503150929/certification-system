@@ -1,59 +1,46 @@
 <template>
-  <div class="curriculum-goals-container">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <div class="header-left">
-            <el-breadcrumb separator="/">
-              <el-breadcrumb-item :to="{ path: '/curriculum/management' }">专业管理</el-breadcrumb-item>
-              <el-breadcrumb-item>培养目标管理</el-breadcrumb-item>
-            </el-breadcrumb>
-            <div class="page-subtitle">{{ programName }}</div>
-          </div>
-          <div class="header-right">
-            <el-button type="primary" :icon="Plus" @click="handleAdd">新增目标</el-button>
+  <div class="goals-tab">
+    <div class="tab-header">
+      <span class="tab-title">培养目标列表</span>
+      <el-button type="primary" size="small" :icon="Plus" @click="handleAdd">新增目标</el-button>
+    </div>
+
+    <div class="goal-list" v-loading="loading">
+      <div v-for="(item, index) in goalList" :key="item.id" class="goal-item">
+        <div class="goal-header">
+          <span class="goal-index">目标 {{ index + 1 }}</span>
+          <span class="goal-sort">排序: {{ item.sortOrder || 0 }}</span>
+          <div class="goal-actions">
+            <el-button link type="primary" :icon="Edit" @click="handleEdit(item)" />
+            <el-button link type="danger" :icon="Delete" @click="handleDelete(item.id)" />
           </div>
         </div>
-      </template>
-
-      <div class="goal-list">
-        <div v-loading="loading">
-          <div v-for="(item, index) in goalList" :key="item.id" class="goal-item">
-            <div class="goal-header">
-              <span class="goal-index">目标 {{ index + 1 }}</span>
-              <span class="goal-sort">排序: {{ item.sortOrder || 0 }}</span>
-              <div class="goal-actions">
-                <el-button link type="primary" :icon="Edit" @click="handleEdit(item)" />
-                <el-button link type="danger" :icon="Delete" @click="handleDelete(item.id)" />
-              </div>
-            </div>
-            <div class="goal-content">
-              <p>{{ item.description }}</p>
-            </div>
-          </div>
+        <div class="goal-content">
+          <p>{{ item.description }}</p>
         </div>
-
-        <el-empty v-if="!loading && goalList.length === 0" description="暂无培养目标" />
       </div>
-    </el-card>
+      <el-empty v-if="!loading && goalList.length === 0" description="暂无培养目标" />
+    </div>
 
+    <!-- 新增/编辑弹窗 -->
     <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="600px"
-      @close="resetForm"
+        v-model="dialogVisible"
+        :title="dialogTitle"
+        width="600px"
+        @close="resetForm"
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px">
         <el-form-item label="目标描述" prop="description">
           <el-input
-            v-model="formData.description"
-            type="textarea"
-            :rows="4"
-            placeholder="请输入培养目标描述"
+              v-model="formData.description"
+              type="textarea"
+              :rows="4"
+              placeholder="请输入培养目标描述"
           />
         </el-form-item>
         <el-form-item label="排序号" prop="sortOrder">
           <el-input-number v-model="formData.sortOrder" :min="0" :max="999" controls-position="right" />
+          <span class="form-tip">数字越小越靠前</span>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -65,15 +52,19 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
-const route = useRoute()
-const programId = ref(route.query.programId || '')
-const programName = ref('')
+const props = defineProps({
+  programId: {
+    type: [String, Number],
+    required: true
+  }
+})
+
+const emit = defineEmits(['change'])
 
 const goalList = ref([])
 const loading = ref(false)
@@ -94,25 +85,12 @@ const formRules = {
   description: [{ required: true, message: '请输入目标描述', trigger: 'blur' }]
 }
 
-// 加载专业信息
-const loadProgramInfo = async () => {
-  if (!programId.value) return
-  try {
-    const res = await request.get(`/admin/program/get/${programId.value}`)
-    if (res.data) {
-      programName.value = res.data.majorName || ''
-    }
-  } catch {
-    // ignore
-  }
-}
-
 // 加载培养目标列表
 const loadGoals = async () => {
-  if (!programId.value) return
+  if (!props.programId) return
   loading.value = true
   try {
-    const res = await request.get(`/admin/program/objectives/list/${programId.value}`)
+    const res = await request.get(`/admin/program/objectives/list/${props.programId}`)
     goalList.value = res.data || []
   } catch (e) {
     ElMessage.error(e.message || '加载培养目标失败')
@@ -121,9 +99,16 @@ const loadGoals = async () => {
   }
 }
 
+// 保存全部（供父组件调用）
+const saveAll = async () => {
+  // 培养目标没有批量保存，只有单个增删改
+  ElMessage.success('培养目标已保存')
+}
+
 const handleAdd = () => {
   dialogTitle.value = '新增培养目标'
   isEdit.value = false
+  formData.sortOrder = goalList.value.length + 1
   dialogVisible.value = true
 }
 
@@ -142,6 +127,7 @@ const handleDelete = (id) => {
       await request.delete(`/admin/program/objectives/delete/${id}`)
       ElMessage.success('删除成功')
       loadGoals()
+      emit('change')
     } catch (e) {
       ElMessage.error(e.message || '删除失败')
     }
@@ -153,25 +139,23 @@ const submitForm = () => {
     if (!valid) return
     submitting.value = true
     try {
+      const payload = {
+        programId: Number(props.programId),
+        description: formData.description,
+        sortOrder: formData.sortOrder
+      }
       if (isEdit.value) {
-        await request.put('/admin/program/objectives/update', {
-          id: editId.value,
-          programId: Number(programId.value),
-          description: formData.description,
-          sortOrder: formData.sortOrder
-        })
+        payload.id = editId.value
+        await request.put('/admin/program/objectives/update', payload)
         ElMessage.success('更新成功')
       } else {
-        await request.post('/admin/program/objectives/add', {
-          programId: Number(programId.value),
-          description: formData.description,
-          sortOrder: formData.sortOrder
-        })
+        await request.post('/admin/program/objectives/add', payload)
         ElMessage.success('新增成功')
       }
       dialogVisible.value = false
       resetForm()
       loadGoals()
+      emit('change')
     } catch (e) {
       ElMessage.error(e.message || '操作失败')
     } finally {
@@ -188,43 +172,45 @@ const resetForm = () => {
   editId.value = ''
 }
 
-onMounted(() => {
-  loadProgramInfo()
+// 监听 programId 变化重新加载
+watch(() => props.programId, () => {
   loadGoals()
+})
+
+onMounted(() => {
+  loadGoals()
+})
+
+// 暴露方法给父组件
+defineExpose({
+  saveAll
 })
 </script>
 
 <style scoped>
-.curriculum-goals-container { padding: 20px; }
+.goals-tab {
+  padding: 4px 0;
+}
 
-.card-header {
+.tab-header {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  width: 100%;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
-.header-left {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.tab-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
 }
 
-.header-right {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-  margin-top: 2px;
+.form-tip {
+  margin-left: 12px;
+  font-size: 13px;
+  color: #909399;
 }
 
-.page-subtitle {
-  font-size: 18px;
-  font-weight: 600;
-  color: #409EFF;
-  margin-left: 2px;
-}
-
-.goal-list { margin-top: 16px; }
 .goal-item {
   padding: 16px 20px;
   margin-bottom: 12px;

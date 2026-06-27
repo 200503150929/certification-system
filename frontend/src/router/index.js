@@ -17,10 +17,9 @@ import ChangePassword from '../views/ChangePassword.vue'
 
 // ============ 模块二：人才培养方案管理 ============
 import CurriculumManagement from '../views/curriculum/CurriculumManagement.vue'
-import CurriculumGoals from '../views/curriculum/CurriculumGoals.vue'
-import CurriculumRequirements from '../views/curriculum/CurriculumRequirements.vue'
-import CurriculumIndicators from '../views/curriculum/CurriculumIndicators.vue'
-import CurriculumMatrix from '../views/curriculum/CurriculumMatrix.vue'
+import ProgramDetail from '../views/curriculum/ProgramDetail.vue'
+// 旧路由（后续可删除）
+
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -167,7 +166,20 @@ const router = createRouter({
         },
 
         // ============ 模块二：人才培养方案管理（仅管理员） ============
-        // ----- 专业管理 -----
+
+        // ----- 【新增】专业详情页（包含 Tab：培养目标、毕业要求、支撑矩阵） -----
+        {
+          path: '/curriculum/detail/:id',
+          name: 'ProgramDetail',
+          component: ProgramDetail,
+          meta: {
+            title: '专业详情',
+            icon: 'DocumentCopy',
+            roles: ['admin']
+          }
+        },
+
+        // ----- 专业管理（列表页） -----
         {
           path: '/curriculum/management',
           name: 'CurriculumManagement',
@@ -179,53 +191,54 @@ const router = createRouter({
           }
         },
 
-        // ----- 培养目标管理 -----
-        {
-          path: '/curriculum/goals',
-          name: 'CurriculumGoals',
-          component: CurriculumGoals,
-          meta: {
-            title: '培养目标管理',
-            icon: 'DocumentAdd',
-            roles: ['admin']
-          }
-        },
-
-        // ----- 毕业要求管理 -----
-        {
-          path: '/curriculum/requirements',
-          name: 'CurriculumRequirements',
-          component: CurriculumRequirements,
-          meta: {
-            title: '毕业要求管理',
-            icon: 'DocumentChecked',
-            roles: ['admin']
-          }
-        },
-
-        // ----- 指标点管理 -----
-        {
-          path: '/curriculum/indicators',
-          name: 'CurriculumIndicators',
-          component: CurriculumIndicators,
-          meta: {
-            title: '指标点管理',
-            icon: 'List',
-            roles: ['admin']
-          }
-        },
-
-        // ----- 支撑矩阵 -----
-        {
-          path: '/curriculum/matrix',
-          name: 'CurriculumMatrix',
-          component: CurriculumMatrix,
-          meta: {
-            title: '支撑矩阵',
-            icon: 'Grid',
-            roles: ['admin']
-          }
-        },
+        // // ============ 以下旧路由保留兼容，后续可删除 ============
+        // // ----- 培养目标管理（旧，后续删除） -----
+        // {
+        //   path: '/curriculum/goals',
+        //   name: 'CurriculumGoals',
+        //   component: CurriculumGoals,
+        //   meta: {
+        //     title: '培养目标管理',
+        //     icon: 'DocumentAdd',
+        //     roles: ['admin']
+        //   }
+        // },
+        //
+        // // ----- 毕业要求管理（旧，后续删除） -----
+        // {
+        //   path: '/curriculum/requirements',
+        //   name: 'CurriculumRequirements',
+        //   component: CurriculumRequirements,
+        //   meta: {
+        //     title: '毕业要求管理',
+        //     icon: 'DocumentChecked',
+        //     roles: ['admin']
+        //   }
+        // },
+        //
+        // // ----- 指标点管理（旧，后续删除） -----
+        // {
+        //   path: '/curriculum/indicators',
+        //   name: 'CurriculumIndicators',
+        //   component: CurriculumIndicators,
+        //   meta: {
+        //     title: '指标点管理',
+        //     icon: 'List',
+        //     roles: ['admin']
+        //   }
+        // },
+        //
+        // // ----- 支撑矩阵（旧，后续删除） -----
+        // {
+        //   path: '/curriculum/matrix',
+        //   name: 'CurriculumMatrix',
+        //   component: CurriculumMatrix,
+        //   meta: {
+        //     title: '支撑矩阵',
+        //     icon: 'Grid',
+        //     roles: ['admin']
+        //   }
+        // },
 
         // ----- 系统设置（仅管理员，暂时注释） -----
         // {

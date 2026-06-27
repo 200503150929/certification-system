@@ -8,14 +8,14 @@
       </div>
 
       <el-menu
-        active-text-color="#ffd04b"
-        background-color="#001529"
-        class="el-menu-vertical-demo"
-        :default-active="activeMenu"
-        text-color="#fff"
-        router
-        :collapse="isCollapse"
-        :collapse-transition="false"
+          active-text-color="#ffd04b"
+          background-color="#001529"
+          class="el-menu-vertical-demo"
+          :default-active="activeMenu"
+          text-color="#fff"
+          router
+          :collapse="isCollapse"
+          :collapse-transition="false"
       >
         <!-- 仪表盘 -->
         <el-menu-item v-if="userRole !== 'student'" index="/dashboard">
@@ -42,25 +42,19 @@
             <span>课程体系管理</span>
           </template>
           <el-menu-item
-            v-for="program in courseProgramList"
-            :key="program.id"
-            :index="`/courses/program/${program.id}`"
+              v-for="program in courseProgramList"
+              :key="program.id"
+              :index="`/courses/program/${program.id}`"
           >
             {{ program.name }}
           </el-menu-item>
         </el-sub-menu>
 
-        <!-- ============ 模块二：人才培养方案管理（仅管理员） ============ -->
-        <el-sub-menu v-if="userRole === 'admin'" index="curriculum">
-          <template #title>
-            <el-icon><DocumentCopy /></el-icon>
-            <span>人才培养方案</span>
-          </template>
-          <el-menu-item index="/curriculum/management">专业管理</el-menu-item>
-          <el-menu-item index="/curriculum/goals">培养目标</el-menu-item>
-          <el-menu-item index="/curriculum/requirements">毕业要求</el-menu-item>
-          <el-menu-item index="/curriculum/indicators">指标点</el-menu-item>
-        </el-sub-menu>
+        <!-- 人才培养方案管理（直接跳转，无下拉） -->
+        <el-menu-item v-if="userRole === 'admin'" index="/curriculum/management">
+          <el-icon><DocumentCopy /></el-icon>
+          <span>人才培养方案管理</span>
+        </el-menu-item>
 
         <!-- 角色权限（仅管理员可见） -->
         <el-sub-menu v-if="userRole === 'admin'" index="roles">
@@ -84,9 +78,9 @@
           </div>
         </div>
         <el-button
-          class="collapse-btn"
-          text
-          @click="toggleCollapse"
+            class="collapse-btn"
+            text
+            @click="toggleCollapse"
         >
           <el-icon v-if="isCollapse"><Expand /></el-icon>
           <el-icon v-else><Fold /></el-icon>
@@ -102,10 +96,16 @@
           <el-button text @click="toggleCollapse" style="padding: 0 8px">
             <el-icon><Fold v-if="!isCollapse" /><Expand v-else /></el-icon>
           </el-button>
+          <!-- 面包屑：所有父级都可点击跳转 -->
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="breadcrumbParent">{{ breadcrumbParent }}</el-breadcrumb-item>
-            <el-breadcrumb-item>{{ $route.meta.title || $route.name }}</el-breadcrumb-item>
+            <el-breadcrumb-item
+                v-for="(item, index) in breadcrumbItems"
+                :key="index"
+                :to="item.path ? { path: item.path } : undefined"
+            >
+              {{ item.name }}
+            </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
 
@@ -139,14 +139,18 @@
 
       <!-- 内容区域 -->
       <el-main>
-        <router-view />
+        <router-view v-slot="{ Component }">
+          <keep-alive :include="['CurriculumManagement', 'CurriculumGoals', 'CurriculumRequirements', 'CurriculumIndicators', 'CurriculumMatrix']">
+            <component :is="Component" />
+          </keep-alive>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -189,30 +193,116 @@ const courseProgramList = [
   { id: '4', name: '人工智能' }
 ]
 
-// ============ 面包屑 ============
-const breadcrumbParent = computed(() => {
-  const path = route.path
+// ============ 面包屑配置 ============
+// 每个路由对应的面包屑层级配置
+const breadcrumbConfig = {
+  // 人才培养方案模块
+  '/curriculum/management': {
+    items: [
+      { name: '人才培养方案' }
+    ]
+  },
+  '/curriculum/goals': {
+    items: [
+      { name: '人才培养方案', path: '/curriculum/management' },
+      { name: '培养目标管理' }
+    ]
+  },
+  '/curriculum/requirements': {
+    items: [
+      { name: '人才培养方案', path: '/curriculum/management' },
+      { name: '毕业要求管理' }
+    ]
+  },
+  '/curriculum/indicators': {
+    items: [
+      { name: '人才培养方案', path: '/curriculum/management' },
+      { name: '毕业要求管理', path: '/curriculum/requirements' },
+      { name: '指标点管理' }
+    ]
+  },
+  '/curriculum/matrix': {
+    items: [
+      { name: '人才培养方案', path: '/curriculum/management' },
+      { name: '支撑矩阵管理' }
+    ]
+  },
 
-  // 模块二：人才培养方案
-  if (path.startsWith('/curriculum/management')) return '人才培养方案'
-  if (path.startsWith('/curriculum/goals')) return '人才培养方案'
-  if (path.startsWith('/curriculum/requirements')) return '人才培养方案'
-  if (path.startsWith('/curriculum/indicators')) return '人才培养方案'
-  if (path.startsWith('/curriculum/matrix')) return '人才培养方案'
+  // 课程管理模块
+  '/my-courses': {
+    items: [
+      { name: userRole.value === 'student' ? '课程学习' : '课程管理' }
+    ]
+  },
+  '/courses/program': {
+    items: [
+      { name: '课程体系管理', path: '/my-courses' }
+    ]
+  },
 
-  // 模块七：个人信息与课程
-  if (path.startsWith('/profile')) return '个人中心'
-  if (path.startsWith('/courses/program')) return '课程体系管理'
-  if (path.startsWith('/my-courses')) return userRole.value === 'student' ? '课程学习' : '课程管理'
-  if (path.startsWith('/teacher/course')) return '课程管理'
-  if (path.startsWith('/course')) return userRole.value === 'student' ? '课程学习' : '课程管理'
+  // 系统管理模块
+  '/users': {
+    items: [
+      { name: '系统管理' },
+      { name: '用户管理' }
+    ]
+  },
+  '/roles': {
+    items: [
+      { name: '系统管理' },
+      { name: '角色权限管理' }
+    ]
+  },
 
-  // 系统管理
-  if (path.startsWith('/users')) return '系统管理'
-  if (path.startsWith('/roles')) return '系统管理'
-  if (path.startsWith('/settings')) return '系统设置'
+  // 个人信息
+  '/profile': {
+    items: [
+      { name: '个人中心' },
+      { name: '个人信息' }
+    ]
+  },
 
-  return ''
+  // 仪表盘
+  '/dashboard': {
+    items: [
+      { name: '仪表盘' }
+    ]
+  }
+}
+
+// 动态匹配面包屑配置（支持带参数的路由）
+const getBreadcrumbConfig = (path) => {
+  // 精确匹配
+  if (breadcrumbConfig[path]) {
+    return breadcrumbConfig[path]
+  }
+
+  // 动态路由匹配（如 /courses/program/1）
+  if (path.startsWith('/courses/program/')) {
+    const baseConfig = breadcrumbConfig['/courses/program']
+    if (baseConfig) {
+      // 获取专业名称
+      const programId = path.split('/').pop()
+      const program = courseProgramList.find(p => p.id === programId)
+      return {
+        items: [
+          { name: '课程体系管理', path: '/my-courses' },
+          { name: program?.name || '课程管理' }
+        ]
+      }
+    }
+  }
+
+  // 默认：只显示当前路由名称
+  return {
+    items: [{ name: route.meta?.title || route.name || '未知页面' }]
+  }
+}
+
+// 计算面包屑数据
+const breadcrumbItems = computed(() => {
+  const config = getBreadcrumbConfig(route.path)
+  return config.items || [{ name: route.meta?.title || route.name || '未知页面' }]
 })
 
 // ============ 当前激活菜单 ============
@@ -221,8 +311,8 @@ const activeMenu = computed(() => {
   if (route.path.startsWith('/course/')) return '/my-courses'
   if (route.path.startsWith('/teacher/course/')) return '/my-courses'
   if (route.path.startsWith('/courses/program/')) return route.path
-  // 人才培养方案子菜单高亮
-  if (route.path.startsWith('/curriculum/')) return route.path
+  // 人才培养方案所有子页面都高亮"人才培养方案"菜单
+  if (route.path.startsWith('/curriculum/')) return '/curriculum/management'
   return route.path
 })
 
@@ -248,20 +338,17 @@ const handleCommand = (command) => {
 // 退出登录方法
 const handleLogout = () => {
   ElMessageBox.confirm(
-    '确定要退出登录吗？',
-    '退出确认',
-    {
-      confirmButtonText: '确定退出',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
+      '确定要退出登录吗？',
+      '退出确认',
+      {
+        confirmButtonText: '确定退出',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
   ).then(() => {
-    // 调用 authStore.logout() 统一清除 state + localStorage + 跳转登录页
     authStore.logout()
     ElMessage.success('已安全退出')
-  }).catch(() => {
-    // 用户取消退出
-  })
+  }).catch(() => {})
 }
 
 // ============ 加载用户信息 ============
@@ -272,11 +359,6 @@ const loadUserInfo = () => {
   userInfo.value.role = role
   userInfo.value.name = name
 }
-
-// ============ 监听路由变化，更新通知等 ============
-watch(() => route.path, (newPath) => {
-  // 可以在这里添加页面切换时的逻辑
-})
 
 // ============ 生命周期 ============
 onMounted(() => {
@@ -333,14 +415,6 @@ onMounted(() => {
 }
 .el-menu .el-menu-item.is-active {
   background-color: rgba(64, 158, 255, 0.2) !important;
-}
-
-/* 子菜单样式 */
-.el-menu .el-sub-menu .el-menu-item {
-  padding-left: 50px !important;
-}
-.el-menu--collapse .el-sub-menu .el-menu-item {
-  padding-left: 20px !important;
 }
 
 /* 侧边栏底部 */
@@ -416,6 +490,14 @@ onMounted(() => {
 .el-breadcrumb :deep(.el-breadcrumb__inner:last-child) {
   color: #333;
   font-weight: 600;
+  cursor: default;
+}
+.el-breadcrumb :deep(.el-breadcrumb__inner:not(:last-child)) {
+  color: #409EFF;
+}
+.el-breadcrumb :deep(.el-breadcrumb__inner:not(:last-child):hover) {
+  color: #66b1ff;
+  text-decoration: underline;
 }
 
 .header-right {
