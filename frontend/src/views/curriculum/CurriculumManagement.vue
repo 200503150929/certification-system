@@ -329,24 +329,49 @@ const handleDelete = (id) => {
   }).catch(() => {})
 }
 
-// ============ 发布/取消发布 ============
+// ============ 发布 ============
 const handlePublish = async (id) => {
   try {
+    await ElMessageBox.confirm(
+        '确认发布该培养方案吗？<br>⚠️ <b>发布后将变为只读状态，不可再编辑。</b>',
+        '发布确认',
+        {
+          dangerouslyUseHTMLString: true,
+          confirmButtonText: '确认发布',
+          cancelButtonText: '取消',
+          type: 'info'
+        }
+    )
     await request.put(`/admin/program/publish/${id}`)
     ElMessage.success('发布成功')
     loadPrograms()
   } catch (e) {
-    ElMessage.error(e.message || '发布失败')
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '发布失败')
+    }
   }
 }
 
+// ============ 取消发布 ============
 const handleUnpublish = async (id) => {
   try {
+    await ElMessageBox.confirm(
+        '确认取消发布该培养方案吗？<br><br>取消后将变为草稿状态，可以重新编辑。',
+        '取消发布确认',
+        {
+          dangerouslyUseHTMLString: true,
+          confirmButtonText: '确认取消',
+          cancelButtonText: '取消',
+          type: 'warning'
+        }
+    )
     await request.put(`/admin/program/unpublish/${id}`)
     ElMessage.success('已取消发布')
     loadPrograms()
   } catch (e) {
-    ElMessage.error(e.message || '操作失败')
+    if (e !== 'cancel') {
+      ElMessage.error(e.message || '操作失败')
+    }
   }
 }
 

@@ -256,7 +256,7 @@ const handlePublish = async () => {
   // 4. 二次确认
   try {
     await ElMessageBox.confirm(
-        '确认发布该培养方案吗？<br><br>⚠️ <b>发布后将变为只读状态，不可再编辑。</b>',
+        '确认发布该培养方案吗？<br>⚠️ <b>发布后将变为只读状态，不可再编辑。</b>',
         '发布确认',
         {
           dangerouslyUseHTMLString: true,

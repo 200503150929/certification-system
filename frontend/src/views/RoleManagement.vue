@@ -17,7 +17,6 @@
               </div>
               <div>
                 <span class="role-name">{{ getRoleLabel(role.roleName) }}</span>
-                <el-tag size="small" type="info">系统预设</el-tag>
               </div>
             </div>
           </div>

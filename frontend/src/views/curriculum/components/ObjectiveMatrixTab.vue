@@ -2,7 +2,7 @@
   <div class="matrix-tab">
     <div class="tab-header">
       <div class="header-left">
-        <span class="tab-title">支撑矩阵管理</span>
+        <span class="tab-title">培养目标-毕业要求支撑矩阵</span>
         <el-tag v-if="hasUnsavedChanges" type="warning" size="small" effect="plain">
           <el-icon><Warning /></el-icon>
           未保存
