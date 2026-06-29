@@ -48,13 +48,15 @@
         <el-tab-pane label="课程资源" name="resources">
           <div class="resources-content" v-loading="resLoading">
             <el-table :data="resources" border v-if="resources.length">
-              <el-table-column prop="fileName" label="资源名称" />
+              <el-table-column prop="fileName" label="资源名称" min-width="200" />
               <el-table-column prop="resourceType" label="类型" width="120">
                 <template #default="scope">
-                  <el-tag size="small">{{ scope.row.resourceType || '-' }}</el-tag>
+                  <el-tag size="small" :type="getResourceTypeTag(scope.row.resourceType)">
+                    {{ scope.row.resourceType || '其他' }}
+                  </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="createdAt" label="上传时间" width="170" />
+              <el-table-column prop="uploadTime" label="上传时间" width="170" />
               <el-table-column label="操作" width="120">
                 <template #default="scope">
                   <el-button link type="primary" @click="downloadResource(scope.row)">下载</el-button>
@@ -117,6 +119,7 @@ const courseInfo = ref({
 const objectives = ref([])
 const resources = ref([])
 const myGrade = ref(null)
+
 const gradeTableData = computed(() => {
   if (!myGrade.value) return []
   return [
@@ -127,6 +130,20 @@ const gradeTableData = computed(() => {
     { label: '最终成绩', value: myGrade.value.totalScore },
   ]
 })
+
+// 资源类型标签颜色映射
+const getResourceTypeTag = (type) => {
+  const map = {
+    '课件': 'primary',
+    '教案': 'success',
+    '参考资料': 'warning',
+    '习题': 'danger',
+    '实验指导': 'info',
+    '视频': '',
+    '其他': 'info'
+  }
+  return map[type] || 'info'
+}
 
 // 从学生课程列表中找到对应课程信息，并获取详情
 const loadCourseInfo = async () => {
@@ -199,16 +216,16 @@ const downloadResource = (row) => {
   const token = localStorage.getItem('token')
   const url = `/api/teacher/resources/download/${row.id}`
   fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    .then(res => res.blob())
-    .then(blob => {
-      const blobUrl = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = blobUrl
-      a.download = row.fileName || 'download'
-      a.click()
-      window.URL.revokeObjectURL(blobUrl)
-    })
-    .catch(() => ElMessage.error('下载失败'))
+      .then(res => res.blob())
+      .then(blob => {
+        const blobUrl = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = blobUrl
+        a.download = row.fileName || 'download'
+        a.click()
+        window.URL.revokeObjectURL(blobUrl)
+      })
+      .catch(() => ElMessage.error('下载失败'))
 }
 
 onMounted(() => {
