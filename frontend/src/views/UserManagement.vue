@@ -34,7 +34,7 @@
         </div>
       </template>
 
-      <el-table :data="tableData" style="width: 100%" v-loading="loading">
+      <el-table :data="tableData" style="width: 100%" v-loading="loading" border>
         <el-table-column prop="username" label="工号" width="120"></el-table-column>
         <el-table-column prop="name" label="姓名" width="100"></el-table-column>
         <el-table-column prop="role" label="角色" width="100">
@@ -42,7 +42,8 @@
             <el-tag :type="getRoleTagType(scope.row.role)">{{ getRoleLabel(scope.row.role) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="department" label="院系" min-width="150"></el-table-column>
+        <el-table-column prop="college" label="学院" min-width="150"></el-table-column>
+        <el-table-column prop="major" label="专业" min-width="120"></el-table-column>
         <el-table-column prop="phone" label="手机号" width="130"></el-table-column>
         <el-table-column prop="email" label="邮箱" min-width="160"></el-table-column>
         <el-table-column label="状态" width="90">
@@ -94,8 +95,11 @@
             <el-option label="学生" value="student" />
           </el-select>
         </el-form-item>
-        <el-form-item label="院系" prop="department">
-          <el-input v-model="addForm.department" placeholder="请输入院系" />
+        <el-form-item label="学院" prop="college">
+          <el-input v-model="addForm.college" placeholder="请输入学院" />
+        </el-form-item>
+        <el-form-item label="专业" prop="major">
+          <el-input v-model="addForm.major" placeholder="请输入专业" />
         </el-form-item>
         <el-form-item label="手机号" prop="phone">
           <el-input v-model="addForm.phone" placeholder="请输入手机号" />
@@ -130,7 +134,7 @@
         <el-icon><UploadFilled /></el-icon>
         <div class="el-upload__text">将 Excel 文件拖到此处，或<em>点击上传</em></div>
         <template #tip>
-          <div class="el-upload__tip">支持 .xlsx 格式，需包含：用户名、姓名、角色、电话、邮箱、院系</div>
+          <div class="el-upload__tip">支持 .xlsx 格式，需包含：用户名、姓名、角色、电话、邮箱、学院、专业</div>
         </template>
       </el-upload>
     </el-dialog>
@@ -174,7 +178,8 @@ const addForm = reactive({
   username: '',
   name: '',
   role: '',
-  department: '',
+  college: '',
+  major: '',
   phone: '',
   email: '',
   status: 1
@@ -267,7 +272,8 @@ const openEditDialog = (row) => {
   addForm.username = row.username
   addForm.name = row.name
   addForm.role = row.role
-  addForm.department = row.department || ''
+  addForm.college = row.college || ''
+  addForm.major = row.major || ''
   addForm.phone = row.phone || ''
   addForm.email = row.email || ''
   addForm.status = row.status
@@ -283,7 +289,8 @@ const submitAddForm = () => {
         username: addForm.username,
         name: addForm.name,
         role: addForm.role,
-        department: addForm.department,
+        college: addForm.college,
+        major: addForm.major,
         phone: addForm.phone,
         email: addForm.email,
         status: addForm.status
@@ -345,7 +352,8 @@ const resetAddForm = () => {
   addForm.username = ''
   addForm.name = ''
   addForm.role = ''
-  addForm.department = ''
+  addForm.college = ''
+  addForm.major = ''
   addForm.phone = ''
   addForm.email = ''
   addForm.status = 1
