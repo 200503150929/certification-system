@@ -9,6 +9,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 
 /**
@@ -28,9 +29,10 @@ import java.util.*;
  * GR3 "设计/开发解决方案" (code=3)
  *
  * ====== 指标点 ======
- * IP1: code=1.1, 掌基础知识, weight=0.25, passScore=0.60
+ * IP1: code=1.1, 掌握基础知识, weight=0.25, passScore=0.60
  * IP2: code=1.2, 算法分析能力, weight=0.20, passScore=0.60
  * IP3: code=2.1, 数据结构应用, weight=0.15, passScore=0.60
+ * IP4: code=3.1, 设计方案能力, weight=0.15, passScore=0.60
  *
  * ====== 课程 ======
  * CS101 数据结构 (4.0学分, 专业核心, 必修)
@@ -49,10 +51,10 @@ import java.util.*;
  * AS3: 期中考试 (weight=0.30, →CO2)
  * AS4: 期末考试 (weight=0.30, →CO3)
  *
- * ====== 成绩 (学生各考核环节得分) ======
- * student01: 85, 90, 78, 82
- * student02: 92, 88, 85, 90
- * student03: 75, 80, 70, 76
+ * ====== 学生成绩 (StudentGrade 四列) ======
+ * student01: 平时85, 实验90, 期中78, 期末82
+ * student02: 平时92, 实验88, 期中85, 期末90
+ * student03: 平时75, 实验80, 期中70, 期末76
  *
  * ====== 课程目标-指标点支撑矩阵 ======
  * CO1 → IP1 (H), CO1 → IP2 (M)
@@ -74,9 +76,10 @@ public class DataInitializer implements CommandLineRunner {
     private final CourseOfferingRepository courseOfferingRepository;
     private final CourseObjectiveRepository courseObjectiveRepository;
     private final AssessmentRepository assessmentRepository;
-    private final GradeRepository gradeRepository;
     private final ObjectiveIndicatorMatrixRepository oiMatrixRepository;
     private final StudentCourseRepository studentCourseRepository;
+    private final StudentGradeRepository studentGradeRepository;
+    private final GradeWeightConfigRepository weightConfigRepository;
 
     public DataInitializer(RoleRepository roleRepository,
                            UserRepository userRepository,
@@ -88,9 +91,10 @@ public class DataInitializer implements CommandLineRunner {
                            CourseOfferingRepository courseOfferingRepository,
                            CourseObjectiveRepository courseObjectiveRepository,
                            AssessmentRepository assessmentRepository,
-                           GradeRepository gradeRepository,
                            ObjectiveIndicatorMatrixRepository oiMatrixRepository,
-                           StudentCourseRepository studentCourseRepository) {
+                           StudentCourseRepository studentCourseRepository,
+                           StudentGradeRepository studentGradeRepository,
+                           GradeWeightConfigRepository weightConfigRepository) {
         this.roleRepository = roleRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -101,9 +105,10 @@ public class DataInitializer implements CommandLineRunner {
         this.courseOfferingRepository = courseOfferingRepository;
         this.courseObjectiveRepository = courseObjectiveRepository;
         this.assessmentRepository = assessmentRepository;
-        this.gradeRepository = gradeRepository;
         this.oiMatrixRepository = oiMatrixRepository;
         this.studentCourseRepository = studentCourseRepository;
+        this.studentGradeRepository = studentGradeRepository;
+        this.weightConfigRepository = weightConfigRepository;
     }
 
     @Override
@@ -122,7 +127,7 @@ public class DataInitializer implements CommandLineRunner {
         initStudentCourses(offering, students);
         List<CourseObjective> objectives = initObjectives(offering);
         List<Assessment> assessments = initAssessments(offering, objectives);
-        initGrades(assessments, students);
+        initStudentGrades(offering, students);
         initObjectiveIndicatorMatrix(objectives, indicators);
 
         log.info("========== 测试数据初始化完成 ==========");
@@ -168,9 +173,8 @@ public class DataInitializer implements CommandLineRunner {
             teacher.setRole("teacher");
             teacher.setPhone("13800000001");
             teacher.setEmail("zhang@university.edu");
-            teacher.setDepartment("计算机学院");
-            teacher.setTitle("副教授");
-            teacher.setOffice("计算机楼 A305");
+            teacher.setCollege("计算机学院");
+            teacher.setMajor("计算机科学与技术");
             teacher.setStatus(1);
             User saved = userRepository.save(teacher);
             log.info("  ✓ 教师: teacher01 / 123456 (张教授)");
@@ -183,9 +187,9 @@ public class DataInitializer implements CommandLineRunner {
     private List<User> initStudents() {
         List<User> students = new ArrayList<>();
         String[][] data = {
-                {"student01", "张三", "计算机科学与技术", "2024级", "1班"},
-                {"student02", "李四", "计算机科学与技术", "2024级", "2班"},
-                {"student03", "王五", "计算机科学与技术", "2023级", "1班"}
+                {"student01", "张三", "计算机学院", "计算机科学与技术", "2024级", "1班"},
+                {"student02", "李四", "计算机学院", "计算机科学与技术", "2024级", "2班"},
+                {"student03", "王五", "计算机学院", "计算机科学与技术", "2023级", "1班"}
         };
         for (String[] d : data) {
             User s = userRepository.findByUsername(d[0]).orElseGet(() -> {
@@ -194,10 +198,10 @@ public class DataInitializer implements CommandLineRunner {
                 student.setPassword(passwordEncoder.encode("123456"));
                 student.setName(d[1]);
                 student.setRole("student");
-                student.setDepartment("计算机学院");
-                student.setMajor(d[2]);
-                student.setGrade(d[3]);
-                student.setClassName(d[4]);
+                student.setCollege(d[2]);
+                student.setMajor(d[3]);
+                student.setGrade(d[4]);
+                student.setClassName(d[5]);
                 student.setStatus(1);
                 return userRepository.save(student);
             });
@@ -411,19 +415,19 @@ public class DataInitializer implements CommandLineRunner {
         return list;
     }
 
-    // ==================== 成绩 ====================
+    // ==================== 学生成绩 (StudentGrade 四列) ====================
 
-    private void initGrades(List<Assessment> assessments, List<User> students) {
+    private void initStudentGrades(CourseOffering offering, List<User> students) {
         // 检查是否已有成绩
-        List<Long> assessIds = assessments.stream().map(Assessment::getId).toList();
-        if (!gradeRepository.findByAssessmentIdIn(assessIds).isEmpty()) {
-            log.info("  - 成绩数据已存在，跳过");
+        List<StudentGrade> existing = studentGradeRepository.findByOfferingId(offering.getId());
+        if (!existing.isEmpty()) {
+            log.info("  - 学生成绩数据已存在，跳过");
             return;
         }
 
-        // student01: [85, 90, 78, 82]
-        // student02: [92, 88, 85, 90]
-        // student03: [75, 80, 70, 76]
+        // student01: [平时85, 实验90, 期中78, 期末82]
+        // student02: [平时92, 实验88, 期中85, 期末90]
+        // student03: [平时75, 实验80, 期中70, 期末76]
         int[][] scores = {
                 {85, 90, 78, 82},
                 {92, 88, 85, 90},
@@ -432,22 +436,29 @@ public class DataInitializer implements CommandLineRunner {
 
         int totalGrades = 0;
         for (int i = 0; i < students.size(); i++) {
-            for (int j = 0; j < assessments.size(); j++) {
-                Grade g = new Grade();
-                g.setAssessmentId(assessments.get(j).getId());
-                g.setStudentId(students.get(i).getId());
-                g.setScore(new BigDecimal(scores[i][j]));
-                gradeRepository.save(g);
-                totalGrades++;
-            }
+            StudentGrade sg = new StudentGrade();
+            sg.setOfferingId(offering.getId());
+            sg.setStudentId(students.get(i).getId());
+            sg.setDailyScore(new BigDecimal(scores[i][0]));
+            sg.setReportScore(new BigDecimal(scores[i][1]));
+            sg.setMidtermScore(new BigDecimal(scores[i][2]));
+            sg.setFinalScore(new BigDecimal(scores[i][3]));
+
+            // 计算最终成绩（简单平均）
+            BigDecimal total = new BigDecimal(scores[i][0] + scores[i][1] + scores[i][2] + scores[i][3])
+                    .divide(new BigDecimal("4"), 2, RoundingMode.HALF_UP);
+            sg.setTotalScore(total);
+
+            studentGradeRepository.save(sg);
+            totalGrades++;
         }
-        log.info("  ✓ 成绩: {} 条 (3名学生 × 4个考核环节)", totalGrades);
+        log.info("  ✓ 学生成绩: {} 条 (3名学生 × 四列成绩)", totalGrades);
     }
 
     // ==================== 课程目标-指标点支撑矩阵 ====================
 
     private void initObjectiveIndicatorMatrix(List<CourseObjective> objectives,
-                                               List<IndicatorPoint> indicators) {
+                                              List<IndicatorPoint> indicators) {
         if (oiMatrixRepository.count() > 0) {
             log.info("  - 支撑矩阵已存在，跳过");
             return;

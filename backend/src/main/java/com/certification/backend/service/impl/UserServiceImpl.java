@@ -94,7 +94,8 @@ public class UserServiceImpl implements UserService {
         user.setRole(request.getRole());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
-        user.setDepartment(request.getDepartment());
+        user.setCollege(request.getCollege());  // 学院
+        user.setMajor(request.getMajor());      // 专业
         user.setStatus(request.getStatus() != null ? request.getStatus() : 1);
 
         userRepository.save(user);
@@ -105,7 +106,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserResponse updateUser(UserRequest request) {
         User user = userRepository.findById(request.getId())
-                .orElseThrow(() -> new BusinessException(ResultCodeEnum. USER_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
 
         // 如果修改了用户名，检查是否与其他用户冲突
         if (!user.getUsername().equals(request.getUsername())
@@ -118,7 +119,8 @@ public class UserServiceImpl implements UserService {
         user.setRole(request.getRole());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
-        user.setDepartment(request.getDepartment());
+        user.setCollege(request.getCollege());  // 学院
+        user.setMajor(request.getMajor());      // 专业
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
@@ -199,12 +201,10 @@ public class UserServiceImpl implements UserService {
         resp.setRole(user.getRole());
         resp.setPhone(user.getPhone());
         resp.setEmail(user.getEmail());
-        resp.setDepartment(user.getDepartment());
-        resp.setTitle(user.getTitle());
-        resp.setOffice(user.getOffice());
-        resp.setMajor(user.getMajor());
-        resp.setGrade(user.getGrade());
-        resp.setClassName(user.getClassName());
+        resp.setCollege(user.getCollege());  // 学院
+        resp.setMajor(user.getMajor());      // 专业
+        resp.setGrade(user.getGrade());      // 年级（学生）
+        resp.setClassName(user.getClassName()); // 班级（学生）
         return resp;
     }
 
@@ -219,7 +219,8 @@ public class UserServiceImpl implements UserService {
         resp.setRole(user.getRole());
         resp.setPhone(user.getPhone());
         resp.setEmail(user.getEmail());
-        resp.setDepartment(user.getDepartment());
+        resp.setCollege(user.getCollege());  // 学院
+        resp.setMajor(user.getMajor());      // 专业
         resp.setStatus(user.getStatus());
         resp.setCreatedAt(user.getCreatedAt() != null ? user.getCreatedAt().format(DTF) : null);
         return resp;

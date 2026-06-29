@@ -16,7 +16,8 @@ public class UserResponse {
     private String role;
     private String phone;
     private String email;
-    private String department;
+    private String college;
+    private String major;
     private Integer status;
     private String createdAt;
 

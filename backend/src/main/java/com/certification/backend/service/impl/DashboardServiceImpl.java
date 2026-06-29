@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -49,23 +50,26 @@ public class DashboardServiceImpl implements DashboardService {
     private final IndicatorPointRepository indicatorRepository;
     private final GraduationRequirementRepository requirementRepository;
     private final AssessmentRepository assessmentRepository;
-    private final GradeRepository gradeRepository;
+    private final StudentGradeRepository studentGradeRepository;
     private final AchievementCalculationService achievementService;
+    private final GradeWeightConfigRepository weightConfigRepository;
 
     public DashboardServiceImpl(ProgramRepository programRepository,
-                                 CourseOfferingRepository offeringRepository,
-                                 IndicatorPointRepository indicatorRepository,
-                                 GraduationRequirementRepository requirementRepository,
-                                 AssessmentRepository assessmentRepository,
-                                 GradeRepository gradeRepository,
-                                 AchievementCalculationService achievementService) {
+                                CourseOfferingRepository offeringRepository,
+                                IndicatorPointRepository indicatorRepository,
+                                GraduationRequirementRepository requirementRepository,
+                                AssessmentRepository assessmentRepository,
+                                StudentGradeRepository studentGradeRepository,
+                                AchievementCalculationService achievementService,
+                                GradeWeightConfigRepository weightConfigRepository) {
         this.programRepository = programRepository;
         this.offeringRepository = offeringRepository;
         this.indicatorRepository = indicatorRepository;
         this.requirementRepository = requirementRepository;
         this.assessmentRepository = assessmentRepository;
-        this.gradeRepository = gradeRepository;
+        this.studentGradeRepository = studentGradeRepository;
         this.achievementService = achievementService;
+        this.weightConfigRepository = weightConfigRepository;
     }
 
     // ==================== 内部辅助方法 ====================
@@ -309,29 +313,22 @@ public class DashboardServiceImpl implements DashboardService {
             return result;
         }
 
-        // 批量加载所有考核环节，按 offeringId 分组
-        List<Long> allOfferingIds = offerings.stream()
-                .map(CourseOffering::getId)
-                .collect(Collectors.toList());
-        Map<Long, List<Assessment>> assessmentsByOffering = assessmentRepository
-                .findByOfferingIdIn(allOfferingIds).stream()
-                .collect(Collectors.groupingBy(Assessment::getOfferingId));
-
+        // 从 StudentGrade 获取成绩数据，按课程计算平均分
         Map<Long, BigDecimal> courseAvgScores = new HashMap<>();
 
         for (CourseOffering offering : offerings) {
-            List<Assessment> assessments = assessmentsByOffering.getOrDefault(offering.getId(), Collections.emptyList());
-            List<Long> assessmentIds = assessments.stream()
-                    .map(Assessment::getId)
-                    .collect(Collectors.toList());
-
-            if (assessmentIds.isEmpty()) continue;
-
-            List<Grade> grades = gradeRepository.findByAssessmentIdIn(assessmentIds);
+            List<StudentGrade> grades = studentGradeRepository.findByOfferingId(offering.getId());
             if (grades.isEmpty()) continue;
 
-            BigDecimal avg = BigDecimalUtil.avg(
-                    grades.stream().map(Grade::getScore).collect(Collectors.toList()));
+            // 计算每位学生的最终成绩，然后取课程平均
+            List<BigDecimal> totalScores = grades.stream()
+                    .map(StudentGrade::getTotalScore)
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+
+            if (totalScores.isEmpty()) continue;
+
+            BigDecimal avg = BigDecimalUtil.avg(totalScores);
             courseAvgScores.put(offering.getCourseId(), avg);
         }
 
@@ -370,40 +367,57 @@ public class DashboardServiceImpl implements DashboardService {
         log.info("获取考核环节平均得分率，academicYear={}, semester={}", academicYear, semester);
         Set<Long> offeringIds = resolveOfferingIds(academicYear, semester);
 
-        // 查询考核环节
-        List<Assessment> allAssessments;
+        // 查询符合条件的开课记录
+        List<CourseOffering> offerings;
         if (hasSemesterFilter(offeringIds)) {
-            allAssessments = assessmentRepository.findByOfferingIdIn(new ArrayList<>(offeringIds));
+            offerings = offeringRepository.findByAcademicYearAndSemester(academicYear, semester);
         } else {
-            allAssessments = assessmentRepository.findAll();
+            offerings = offeringRepository.findAll();
         }
 
-        if (allAssessments.isEmpty()) {
+        if (offerings.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 按考核环节名称分组
+        // 按四列成绩名称分组，收集所有得分率
         Map<String, List<BigDecimal>> nameScoreMap = new LinkedHashMap<>();
+        nameScoreMap.put("平时成绩", new ArrayList<>());
+        nameScoreMap.put("实验报告", new ArrayList<>());
+        nameScoreMap.put("期中考试", new ArrayList<>());
+        nameScoreMap.put("期末考试", new ArrayList<>());
 
-        for (Assessment assessment : allAssessments) {
-            List<Grade> grades = gradeRepository.findByAssessmentId(assessment.getId());
+        for (CourseOffering offering : offerings) {
+            // 如果限定了开课范围，过滤
+            if (hasSemesterFilter(offeringIds) && !offeringIds.contains(offering.getId())) {
+                continue;
+            }
+
+            List<StudentGrade> grades = studentGradeRepository.findByOfferingId(offering.getId());
             if (grades.isEmpty()) continue;
 
-            BigDecimal avgScore = BigDecimalUtil.avg(
-                    grades.stream().map(Grade::getScore).collect(Collectors.toList()));
-
-            // 得分率 = 平均分 / 100
-            BigDecimal scoreRate = BigDecimalUtil.scoreToAchievement(avgScore);
-
-            nameScoreMap.computeIfAbsent(assessment.getName(), k -> new ArrayList<>())
-                    .add(scoreRate);
+            for (StudentGrade sg : grades) {
+                if (sg.getDailyScore() != null) {
+                    nameScoreMap.get("平时成绩").add(BigDecimalUtil.scoreToAchievement(sg.getDailyScore()));
+                }
+                if (sg.getReportScore() != null) {
+                    nameScoreMap.get("实验报告").add(BigDecimalUtil.scoreToAchievement(sg.getReportScore()));
+                }
+                if (sg.getMidtermScore() != null) {
+                    nameScoreMap.get("期中考试").add(BigDecimalUtil.scoreToAchievement(sg.getMidtermScore()));
+                }
+                if (sg.getFinalScore() != null) {
+                    nameScoreMap.get("期末考试").add(BigDecimalUtil.scoreToAchievement(sg.getFinalScore()));
+                }
+            }
         }
 
+        // 计算每个考核环节的平均得分率
         List<AssessmentScoreRateDTO> result = new ArrayList<>();
         for (Map.Entry<String, List<BigDecimal>> entry : nameScoreMap.entrySet()) {
+            if (entry.getValue().isEmpty()) continue;
+
             AssessmentScoreRateDTO dto = new AssessmentScoreRateDTO();
             dto.setName(entry.getKey());
-            // 同名称的考核环节取平均得分率
             dto.setScoreRate(BigDecimalUtil.avg(entry.getValue()));
             result.add(dto);
         }

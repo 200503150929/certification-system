@@ -28,7 +28,9 @@ public class UserRequest {
 
     private String email;
 
-    private String department;
+    private String college;
+
+    private String major;
 
     private Integer status;
 

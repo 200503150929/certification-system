@@ -35,30 +35,21 @@ public class StudentGradeServiceImpl implements StudentGradeService {
     private static final BigDecimal SCORE_MIN = BigDecimal.ZERO;
     private static final BigDecimal SCORE_MAX = new BigDecimal("100");
 
-    /** 四列标准成绩名称，用于与 Assessment 表匹配同步 */
-    private static final List<String> ASSESSMENT_NAMES = List.of("平时成绩", "实验报告", "期中考试", "期末考试");
-
     private final StudentGradeRepository studentGradeRepository;
     private final StudentCourseRepository studentCourseRepository;
     private final CourseOfferingRepository offeringRepository;
     private final UserRepository userRepository;
-    private final AssessmentRepository assessmentRepository;
-    private final GradeRepository gradeRepository;
     private final GradeWeightConfigRepository weightConfigRepository;
 
     public StudentGradeServiceImpl(StudentGradeRepository studentGradeRepository,
                                    StudentCourseRepository studentCourseRepository,
                                    CourseOfferingRepository offeringRepository,
                                    UserRepository userRepository,
-                                   AssessmentRepository assessmentRepository,
-                                   GradeRepository gradeRepository,
                                    GradeWeightConfigRepository weightConfigRepository) {
         this.studentGradeRepository = studentGradeRepository;
         this.studentCourseRepository = studentCourseRepository;
         this.offeringRepository = offeringRepository;
         this.userRepository = userRepository;
-        this.assessmentRepository = assessmentRepository;
-        this.gradeRepository = gradeRepository;
         this.weightConfigRepository = weightConfigRepository;
     }
 
@@ -122,7 +113,7 @@ public class StudentGradeServiceImpl implements StudentGradeService {
     @Override
     @Transactional
     public List<StudentGradeResponse> saveBatch(StudentGradeBatchRequest request, String username) {
-        CourseOffering offering = getOfferingAndValidateOwner(request.getOfferingId(), username);
+        getOfferingAndValidateOwner(request.getOfferingId(), username);
 
         List<StudentGrade> toSave = new ArrayList<>();
 
@@ -155,11 +146,6 @@ public class StudentGradeServiceImpl implements StudentGradeService {
 
         List<StudentGrade> saved = studentGradeRepository.saveAll(toSave);
         log.info("批量保存学生成绩：开课ID={}，保存 {} 条记录", request.getOfferingId(), saved.size());
-
-        // 同步到旧 Grade 表（与 Assessment 匹配的列）
-        Map<Long, StudentGrade> savedMap = saved.stream()
-                .collect(Collectors.toMap(StudentGrade::getStudentId, sg -> sg, (a, b) -> a));
-        syncToGradeTable(request.getOfferingId(), savedMap);
 
         return listByOffering(request.getOfferingId(), username);
     }
@@ -297,27 +283,6 @@ public class StudentGradeServiceImpl implements StudentGradeService {
         return toWeightResponse(saved, request.getOfferingId());
     }
 
-    private GradeWeightResponse toWeightResponse(GradeWeightConfig config, Long offeringId) {
-        GradeWeightResponse resp = new GradeWeightResponse();
-        resp.setOfferingId(offeringId);
-        if (config != null) {
-            resp.setId(config.getId());
-            resp.setDailyWeight(config.getDailyWeight());
-            resp.setReportWeight(config.getReportWeight());
-            resp.setMidtermWeight(config.getMidtermWeight());
-            resp.setFinalWeight(config.getFinalWeight());
-            resp.setCreatedAt(config.getCreatedAt() != null ? config.getCreatedAt().format(DTF) : null);
-            resp.setUpdatedAt(config.getUpdatedAt() != null ? config.getUpdatedAt().format(DTF) : null);
-        } else {
-            // 返回默认权重
-            resp.setDailyWeight(new BigDecimal("0.2500"));
-            resp.setReportWeight(new BigDecimal("0.2500"));
-            resp.setMidtermWeight(new BigDecimal("0.2500"));
-            resp.setFinalWeight(new BigDecimal("0.2500"));
-        }
-        return resp;
-    }
-
     // ==================== 私有方法 ====================
 
     /**
@@ -392,60 +357,24 @@ public class StudentGradeServiceImpl implements StudentGradeService {
         return offering;
     }
 
-    /**
-     * 将 StudentGrade 数据同步到旧的 Grade 表
-     * 仅同步名称匹配的考核环节（平时成绩、实验报告、期中考试、期末考试）
-     * 不存在的考核环节静默跳过（教师可以在考核管理中单独配置）
-     */
-    private void syncToGradeTable(Long offeringId, Map<Long, StudentGrade> savedGrades) {
-        List<Assessment> assessments = assessmentRepository.findByOfferingId(offeringId);
-        if (assessments.isEmpty()) {
-            log.debug("开课 ID={} 下无考核环节，跳过 Grade 表同步", offeringId);
-            return;
+    private GradeWeightResponse toWeightResponse(GradeWeightConfig config, Long offeringId) {
+        GradeWeightResponse resp = new GradeWeightResponse();
+        resp.setOfferingId(offeringId);
+        if (config != null) {
+            resp.setId(config.getId());
+            resp.setDailyWeight(config.getDailyWeight());
+            resp.setReportWeight(config.getReportWeight());
+            resp.setMidtermWeight(config.getMidtermWeight());
+            resp.setFinalWeight(config.getFinalWeight());
+            resp.setCreatedAt(config.getCreatedAt() != null ? config.getCreatedAt().format(DTF) : null);
+            resp.setUpdatedAt(config.getUpdatedAt() != null ? config.getUpdatedAt().format(DTF) : null);
+        } else {
+            // 返回默认权重
+            resp.setDailyWeight(new BigDecimal("0.2500"));
+            resp.setReportWeight(new BigDecimal("0.2500"));
+            resp.setMidtermWeight(new BigDecimal("0.2500"));
+            resp.setFinalWeight(new BigDecimal("0.2500"));
         }
-
-        // 按名称匹配：assessmentName（去空白小写）-> Assessment
-        Map<String, Assessment> nameToAssessment = new LinkedHashMap<>();
-        for (Assessment a : assessments) {
-            if (a.getName() != null) {
-                nameToAssessment.putIfAbsent(a.getName().trim().toLowerCase(), a);
-            }
-        }
-
-        for (String standardName : ASSESSMENT_NAMES) {
-            Assessment matched = nameToAssessment.get(standardName.toLowerCase());
-            if (matched == null) {
-                log.debug("开课 ID={} 下无名为 '{}' 的考核环节，跳过同步", offeringId, standardName);
-                continue;
-            }
-
-            for (StudentGrade sg : savedGrades.values()) {
-                BigDecimal score = switch (standardName) {
-                    case "平时成绩" -> sg.getDailyScore();
-                    case "实验报告" -> sg.getReportScore();
-                    case "期中考试" -> sg.getMidtermScore();
-                    case "期末考试" -> sg.getFinalScore();
-                    default -> null;
-                };
-
-                if (score == null) continue;
-
-                // 按 (assessmentId + studentId) 查找已有 Grade 记录，存在则更新，不存在则插入
-                var existing = gradeRepository.findByAssessmentIdAndStudentId(matched.getId(), sg.getStudentId());
-                Grade grade;
-                if (existing.isPresent()) {
-                    grade = existing.get();
-                    grade.setScore(score);
-                } else {
-                    grade = new Grade();
-                    grade.setAssessmentId(matched.getId());
-                    grade.setStudentId(sg.getStudentId());
-                    grade.setScore(score);
-                }
-                gradeRepository.save(grade);
-            }
-        }
-
-        log.info("Grade 表同步完成：开课 ID={}，考生 {} 人", offeringId, savedGrades.size());
+        return resp;
     }
 }

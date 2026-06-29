@@ -33,14 +33,11 @@
 
             <!-- 教师特有字段 -->
             <template v-if="userInfo.role === 'teacher'">
-              <el-descriptions-item label="院系">
-                {{ userInfo.department || '-' }}
+              <el-descriptions-item label="学院">
+                {{ userInfo.college || '-' }}
               </el-descriptions-item>
-              <el-descriptions-item label="职称">
-                {{ userInfo.title || '-' }}
-              </el-descriptions-item>
-              <el-descriptions-item label="办公地点">
-                {{ userInfo.office || '-' }}
+              <el-descriptions-item label="专业">
+                {{ userInfo.major || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="邮箱">
                 {{ userInfo.email || '-' }}
@@ -52,8 +49,8 @@
 
             <!-- 学生特有字段 -->
             <template v-if="userInfo.role === 'student'">
-              <el-descriptions-item label="院系">
-                {{ userInfo.department || '-' }}
+              <el-descriptions-item label="学院">
+                {{ userInfo.college || '-' }}
               </el-descriptions-item>
               <el-descriptions-item label="专业">
                 {{ userInfo.major || '-' }}
@@ -77,10 +74,10 @@
     </el-card>
 
     <el-dialog
-      v-model="dialogVisible"
-      title="编辑信息"
-      width="460px"
-      @close="resetForm"
+        v-model="dialogVisible"
+        title="编辑信息"
+        width="460px"
+        @close="resetForm"
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="90px">
         <el-form-item label="联系电话" prop="phone">
@@ -109,10 +106,8 @@ const userInfo = ref({
   username: '',
   name: '',
   role: '',
-  department: '',
-  title: '',
-  office: '',
-  major: '',
+  college: '',      // 学院（原 department）
+  major: '',        // 专业
   grade: '',
   className: '',
   phone: '',

@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,7 +33,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
 
     private final CourseObjectiveRepository objectiveRepository;
     private final AssessmentRepository assessmentRepository;
-    private final GradeRepository gradeRepository;
+    private final StudentGradeRepository studentGradeRepository;
     private final ObjectiveIndicatorMatrixRepository oiMatrixRepository;
     private final IndicatorPointRepository indicatorRepository;
     private final GraduationRequirementRepository requirementRepository;
@@ -40,21 +41,23 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
     private final CourseRequirementMatrixRepository crMatrixRepository;
+    private final GradeWeightConfigRepository weightConfigRepository;
 
     public AchievementCalculationServiceImpl(
             CourseObjectiveRepository objectiveRepository,
             AssessmentRepository assessmentRepository,
-            GradeRepository gradeRepository,
+            StudentGradeRepository studentGradeRepository,
             ObjectiveIndicatorMatrixRepository oiMatrixRepository,
             IndicatorPointRepository indicatorRepository,
             GraduationRequirementRepository requirementRepository,
             CourseOfferingRepository offeringRepository,
             CourseRepository courseRepository,
             UserRepository userRepository,
-            CourseRequirementMatrixRepository crMatrixRepository) {
+            CourseRequirementMatrixRepository crMatrixRepository,
+            GradeWeightConfigRepository weightConfigRepository) {
         this.objectiveRepository = objectiveRepository;
         this.assessmentRepository = assessmentRepository;
-        this.gradeRepository = gradeRepository;
+        this.studentGradeRepository = studentGradeRepository;
         this.oiMatrixRepository = oiMatrixRepository;
         this.indicatorRepository = indicatorRepository;
         this.requirementRepository = requirementRepository;
@@ -62,6 +65,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         this.courseRepository = courseRepository;
         this.userRepository = userRepository;
         this.crMatrixRepository = crMatrixRepository;
+        this.weightConfigRepository = weightConfigRepository;
     }
 
     // ==================== 课程目标达成度计算 ====================
@@ -77,38 +81,33 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
             return Collections.emptyList();
         }
 
-        // 2. 查询该开课记录下的所有考核环节
-        List<Assessment> assessments = assessmentRepository.findByOfferingId(offeringId);
-        Map<Long, List<Assessment>> objAssessmentMap = assessments.stream()
-                .filter(a -> a.getObjectiveId() != null)
-                .collect(Collectors.groupingBy(Assessment::getObjectiveId));
+        // 2. 查询该开课记录下的所有学生成绩
+        List<StudentGrade> studentGrades = studentGradeRepository.findByOfferingId(offeringId);
+        if (studentGrades.isEmpty()) {
+            log.warn("开课记录 [{}] 下没有学生成绩", offeringId);
+            return Collections.emptyList();
+        }
 
-        // 3. 查询所有考核环节的成绩
-        List<Long> assessmentIds = assessments.stream()
-                .map(Assessment::getId)
-                .collect(Collectors.toList());
-        List<Grade> allGrades = assessmentIds.isEmpty()
-                ? Collections.emptyList()
-                : gradeRepository.findByAssessmentIdIn(assessmentIds);
+        // 3. 获取权重配置
+        GradeWeightConfig config = weightConfigRepository.findByOfferingId(offeringId).orElse(null);
+        BigDecimal dw = config != null ? config.getDailyWeight() : new BigDecimal("0.25");
+        BigDecimal rw = config != null ? config.getReportWeight() : new BigDecimal("0.25");
+        BigDecimal mw = config != null ? config.getMidtermWeight() : new BigDecimal("0.25");
+        BigDecimal fw = config != null ? config.getFinalWeight() : new BigDecimal("0.25");
 
-        // 按 (assessmentId) 分组成绩
-        Map<Long, List<Grade>> gradesByAssessment = allGrades.stream()
-                .collect(Collectors.groupingBy(Grade::getAssessmentId));
-
-        // 收集所有学生ID
-        Set<Long> studentIds = allGrades.stream()
-                .map(Grade::getStudentId)
+        // 4. 查询学生信息
+        Set<Long> studentIds = studentGrades.stream()
+                .map(StudentGrade::getStudentId)
                 .collect(Collectors.toSet());
-
-        // 查询学生信息
         Map<Long, User> userMap = userRepository.findAllById(studentIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u));
 
-        // 4. 对每个课程目标计算达成度
+        // 5. 对每个课程目标计算达成度
         List<ObjectiveAchievementDTO> result = new ArrayList<>();
+
         for (CourseObjective objective : objectives) {
             ObjectiveAchievementDTO dto = calcSingleObjective(
-                    objective, objAssessmentMap, gradesByAssessment, userMap);
+                    objective, studentGrades, userMap, dw, rw, mw, fw);
             if (dto != null) {
                 result.add(dto);
             }
@@ -123,77 +122,57 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
      */
     private ObjectiveAchievementDTO calcSingleObjective(
             CourseObjective objective,
-            Map<Long, List<Assessment>> objAssessmentMap,
-            Map<Long, List<Grade>> gradesByAssessment,
-            Map<Long, User> userMap) {
+            List<StudentGrade> studentGrades,
+            Map<Long, User> userMap,
+            BigDecimal dw, BigDecimal rw, BigDecimal mw, BigDecimal fw) {
 
-        List<Assessment> linkedAssessments = objAssessmentMap.get(objective.getId());
-        if (linkedAssessments == null || linkedAssessments.isEmpty()) {
-            log.info("课程目标 [{}] 没有关联考核环节，跳过", objective.getId());
-            return null;
-        }
-
-        // 收集该目标下所有考核环节的成绩
-        Map<Long, Map<Long, BigDecimal>> studentScores = new HashMap<>();
-        // studentId -> (assessmentId -> score)
-
-        for (Assessment assessment : linkedAssessments) {
-            List<Grade> grades = gradesByAssessment.getOrDefault(assessment.getId(), Collections.emptyList());
-            for (Grade grade : grades) {
-                studentScores
-                        .computeIfAbsent(grade.getStudentId(), k -> new HashMap<>())
-                        .put(assessment.getId(), grade.getScore());
-            }
-        }
-
-        if (studentScores.isEmpty()) {
-            log.info("课程目标 [{}] 没有成绩数据，跳过", objective.getId());
-            return null;
-        }
-
-        // 计算每位学生的达成度
         List<ObjectiveAchievementDTO.StudentAchievement> studentAchievements = new ArrayList<>();
         List<BigDecimal> achievementValues = new ArrayList<>();
 
-        // 计算考核环节权重之和（用于归一化）
-        BigDecimal totalAssessmentWeight = linkedAssessments.stream()
-                .map(a -> a.getWeight() != null ? a.getWeight() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (totalAssessmentWeight.compareTo(BigDecimal.ZERO) == 0) {
-            totalAssessmentWeight = BigDecimal.ONE;
-        }
-
-        for (Map.Entry<Long, Map<Long, BigDecimal>> entry : studentScores.entrySet()) {
-            Long studentId = entry.getKey();
-            Map<Long, BigDecimal> assessScoreMap = entry.getValue();
-
-            // 加权求和：Σ(score_i × weight_i)
+        for (StudentGrade sg : studentGrades) {
+            // 计算加权平均分
             BigDecimal weightedSum = BigDecimal.ZERO;
-            for (Assessment assessment : linkedAssessments) {
-                BigDecimal score = assessScoreMap.get(assessment.getId());
-                if (score != null && assessment.getWeight() != null) {
-                    weightedSum = weightedSum.add(
-                            score.multiply(assessment.getWeight()));
-                }
+            BigDecimal totalWeight = BigDecimal.ZERO;
+
+            if (sg.getDailyScore() != null) {
+                weightedSum = weightedSum.add(sg.getDailyScore().multiply(dw));
+                totalWeight = totalWeight.add(dw);
+            }
+            if (sg.getReportScore() != null) {
+                weightedSum = weightedSum.add(sg.getReportScore().multiply(rw));
+                totalWeight = totalWeight.add(rw);
+            }
+            if (sg.getMidtermScore() != null) {
+                weightedSum = weightedSum.add(sg.getMidtermScore().multiply(mw));
+                totalWeight = totalWeight.add(mw);
+            }
+            if (sg.getFinalScore() != null) {
+                weightedSum = weightedSum.add(sg.getFinalScore().multiply(fw));
+                totalWeight = totalWeight.add(fw);
             }
 
-            // 学生达成度 = 加权平均分 / 100
-            BigDecimal studentAchievement = BigDecimalUtil.divide(weightedSum, totalAssessmentWeight);
-            studentAchievement = BigDecimalUtil.scoreToAchievement(studentAchievement);
+            if (totalWeight.compareTo(BigDecimal.ZERO) == 0) continue;
+
+            BigDecimal avgScore = weightedSum.divide(totalWeight, 2, RoundingMode.HALF_UP);
+            // 将百分制成绩转换为 0~1 之间的达成度
+            BigDecimal achievement = BigDecimalUtil.scoreToAchievement(avgScore);
 
             ObjectiveAchievementDTO.StudentAchievement sa = new ObjectiveAchievementDTO.StudentAchievement();
-            sa.setStudentId(studentId);
-            sa.setAchievement(BigDecimalUtil.format(studentAchievement));
+            sa.setStudentId(sg.getStudentId());
+            sa.setAchievement(BigDecimalUtil.format(achievement));
 
-            User user = userMap.get(studentId);
+            User user = userMap.get(sg.getStudentId());
             if (user != null) {
                 sa.setStudentName(user.getName());
                 sa.setStudentNo(user.getUsername());
             }
 
             studentAchievements.add(sa);
-            achievementValues.add(studentAchievement);
+            achievementValues.add(achievement);
+        }
+
+        if (achievementValues.isEmpty()) {
+            return null;
         }
 
         // 班级达成度 = 各学生达成度的平均值
@@ -204,7 +183,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         dto.setDescription(objective.getDescription());
         dto.setWeight(objective.getWeight());
         dto.setClassAchievement(classAchievement);
-        dto.setAssessmentCount(linkedAssessments.size());
+        dto.setAssessmentCount(4); // 四列成绩：平时、实验、期中、期末
         dto.setStudentCount(studentAchievements.size());
         dto.setStudentAchievements(studentAchievements);
 
@@ -232,8 +211,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         log.info("计算指标点 [{}] 的达成度，offeringIds={}", indicatorId, offeringIds);
 
         // 1. 查询指标点信息
-        IndicatorPoint indicator = indicatorRepository.findById(indicatorId)
-                .orElse(null);
+        IndicatorPoint indicator = indicatorRepository.findById(indicatorId).orElse(null);
         if (indicator == null) {
             log.warn("指标点 [{}] 不存在", indicatorId);
             return null;
@@ -274,7 +252,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
                 continue;
             }
 
-            // 计算该课程目标的达成度（使用开课记录级别的数据）
+            // 计算该课程目标的达成度
             BigDecimal objAchievement = computeObjectiveAchievement(objective);
             if (objAchievement == null) {
                 continue;
@@ -323,56 +301,56 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
     }
 
     /**
-     * 计算单个课程目标的达成度（从考核环节和成绩直接计算）
+     * 计算单个课程目标的达成度（从 StudentGrade 直接计算）
      * 返回 0~1 之间的达成度值
      */
     private BigDecimal computeObjectiveAchievement(CourseObjective objective) {
-        List<Assessment> assessments = assessmentRepository.findByOfferingId(objective.getOfferingId())
-                .stream()
-                .filter(a -> objective.getId().equals(a.getObjectiveId()))
-                .collect(Collectors.toList());
+        Long offeringId = objective.getOfferingId();
 
-        if (assessments.isEmpty()) {
-            return null;
-        }
-
-        List<Long> assessmentIds = assessments.stream()
-                .map(Assessment::getId)
-                .collect(Collectors.toList());
-        List<Grade> grades = gradeRepository.findByAssessmentIdIn(assessmentIds);
-
+        // 查询该开课下所有学生的 StudentGrade
+        List<StudentGrade> grades = studentGradeRepository.findByOfferingId(offeringId);
         if (grades.isEmpty()) {
             return null;
         }
 
-        // 按学生分组
-        Map<Long, List<Grade>> studentGrades = grades.stream()
-                .collect(Collectors.groupingBy(Grade::getStudentId));
-
-        BigDecimal totalWeight = assessments.stream()
-                .map(a -> a.getWeight() != null ? a.getWeight() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (totalWeight.compareTo(BigDecimal.ZERO) == 0) {
-            totalWeight = BigDecimal.ONE;
-        }
+        // 获取权重配置
+        GradeWeightConfig config = weightConfigRepository.findByOfferingId(offeringId).orElse(null);
+        BigDecimal dw = config != null ? config.getDailyWeight() : new BigDecimal("0.25");
+        BigDecimal rw = config != null ? config.getReportWeight() : new BigDecimal("0.25");
+        BigDecimal mw = config != null ? config.getMidtermWeight() : new BigDecimal("0.25");
+        BigDecimal fw = config != null ? config.getFinalWeight() : new BigDecimal("0.25");
 
         // 计算每位学生的加权平均分
         List<BigDecimal> studentAchievements = new ArrayList<>();
-        for (Map.Entry<Long, List<Grade>> entry : studentGrades.entrySet()) {
-            Map<Long, BigDecimal> scoreMap = entry.getValue().stream()
-                    .collect(Collectors.toMap(Grade::getAssessmentId, Grade::getScore));
-
+        for (StudentGrade sg : grades) {
             BigDecimal weightedSum = BigDecimal.ZERO;
-            for (Assessment assessment : assessments) {
-                BigDecimal score = scoreMap.get(assessment.getId());
-                if (score != null && assessment.getWeight() != null) {
-                    weightedSum = weightedSum.add(score.multiply(assessment.getWeight()));
-                }
+            BigDecimal totalWeight = BigDecimal.ZERO;
+
+            if (sg.getDailyScore() != null) {
+                weightedSum = weightedSum.add(sg.getDailyScore().multiply(dw));
+                totalWeight = totalWeight.add(dw);
+            }
+            if (sg.getReportScore() != null) {
+                weightedSum = weightedSum.add(sg.getReportScore().multiply(rw));
+                totalWeight = totalWeight.add(rw);
+            }
+            if (sg.getMidtermScore() != null) {
+                weightedSum = weightedSum.add(sg.getMidtermScore().multiply(mw));
+                totalWeight = totalWeight.add(mw);
+            }
+            if (sg.getFinalScore() != null) {
+                weightedSum = weightedSum.add(sg.getFinalScore().multiply(fw));
+                totalWeight = totalWeight.add(fw);
             }
 
-            BigDecimal avgScore = BigDecimalUtil.divide(weightedSum, totalWeight);
+            if (totalWeight.compareTo(BigDecimal.ZERO) == 0) continue;
+
+            BigDecimal avgScore = weightedSum.divide(totalWeight, 2, RoundingMode.HALF_UP);
             studentAchievements.add(BigDecimalUtil.scoreToAchievement(avgScore));
+        }
+
+        if (studentAchievements.isEmpty()) {
+            return null;
         }
 
         return BigDecimalUtil.avg(studentAchievements);
@@ -511,7 +489,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         if (teacher != null) {
             teacherInfo.setTeacherId(teacher.getId());
             teacherInfo.setName(teacher.getName());
-            teacherInfo.setDepartment(teacher.getDepartment());
+            teacherInfo.setCollege(teacher.getCollege());
         }
 
         // 课程目标达成度
@@ -535,7 +513,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
             }
         }
 
-        // 考核结构信息
+        // 考核结构信息（从 Assessment 获取考核环节配置）
         List<Assessment> assessments = assessmentRepository.findByOfferingId(offeringId);
         List<AchievementReportDTO.AssessmentStructure> structures = new ArrayList<>();
 
@@ -543,31 +521,81 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         Map<Long, String> objectiveNameMap = objectiveRepository.findByOfferingId(offeringId).stream()
                 .collect(Collectors.toMap(CourseObjective::getId, CourseObjective::getDescription));
 
-        List<Long> assessmentIds = assessments.stream().map(Assessment::getId).collect(Collectors.toList());
-        List<Grade> allGrades = assessmentIds.isEmpty()
-                ? Collections.emptyList()
-                : gradeRepository.findByAssessmentIdIn(assessmentIds);
-        Map<Long, List<Grade>> gradeMap = allGrades.stream()
-                .collect(Collectors.groupingBy(Grade::getAssessmentId));
+        // 从 StudentGrade 获取成绩数据计算各考核环节平均分
+        List<StudentGrade> studentGrades = studentGradeRepository.findByOfferingId(offeringId);
 
-        for (Assessment assessment : assessments) {
-            AchievementReportDTO.AssessmentStructure as = new AchievementReportDTO.AssessmentStructure();
-            as.setAssessmentId(assessment.getId());
-            as.setName(assessment.getName());
-            as.setWeight(assessment.getWeight());
-            as.setLinkedObjective(objectiveNameMap.getOrDefault(assessment.getObjectiveId(), "未关联"));
+        // 计算四列成绩的平均分
+        BigDecimal avgDaily = BigDecimal.ZERO;
+        BigDecimal avgReport = BigDecimal.ZERO;
+        BigDecimal avgMidterm = BigDecimal.ZERO;
+        BigDecimal avgFinal = BigDecimal.ZERO;
+        int count = studentGrades.size();
 
-            List<Grade> grades = gradeMap.getOrDefault(assessment.getId(), Collections.emptyList());
-            if (!grades.isEmpty()) {
-                BigDecimal avgScore = BigDecimalUtil.avg(
-                        grades.stream().map(Grade::getScore).collect(Collectors.toList()));
-                as.setAverageScore(avgScore);
-                as.setScoreRate(BigDecimalUtil.divide(avgScore, BigDecimalUtil.FULL_SCORE));
-            } else {
-                as.setAverageScore(BigDecimal.ZERO);
-                as.setScoreRate(BigDecimal.ZERO);
+        if (count > 0) {
+            BigDecimal sumDaily = BigDecimal.ZERO;
+            BigDecimal sumReport = BigDecimal.ZERO;
+            BigDecimal sumMidterm = BigDecimal.ZERO;
+            BigDecimal sumFinal = BigDecimal.ZERO;
+            int dailyCount = 0, reportCount = 0, midtermCount = 0, finalCount = 0;
+
+            for (StudentGrade sg : studentGrades) {
+                if (sg.getDailyScore() != null) {
+                    sumDaily = sumDaily.add(sg.getDailyScore());
+                    dailyCount++;
+                }
+                if (sg.getReportScore() != null) {
+                    sumReport = sumReport.add(sg.getReportScore());
+                    reportCount++;
+                }
+                if (sg.getMidtermScore() != null) {
+                    sumMidterm = sumMidterm.add(sg.getMidtermScore());
+                    midtermCount++;
+                }
+                if (sg.getFinalScore() != null) {
+                    sumFinal = sumFinal.add(sg.getFinalScore());
+                    finalCount++;
+                }
             }
 
+            avgDaily = dailyCount > 0 ? sumDaily.divide(new BigDecimal(dailyCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            avgReport = reportCount > 0 ? sumReport.divide(new BigDecimal(reportCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            avgMidterm = midtermCount > 0 ? sumMidterm.divide(new BigDecimal(midtermCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+            avgFinal = finalCount > 0 ? sumFinal.divide(new BigDecimal(finalCount), 2, RoundingMode.HALF_UP) : BigDecimal.ZERO;
+        }
+
+        // 为每个考核环节构建结构信息
+        Map<String, Assessment> assessmentMap = assessments.stream()
+                .collect(Collectors.toMap(Assessment::getName, a -> a, (a, b) -> a));
+
+        // 四列成绩名称与平均分的映射
+        Map<String, BigDecimal> nameToAvgScore = new LinkedHashMap<>();
+        nameToAvgScore.put("平时作业", avgDaily);
+        nameToAvgScore.put("实验报告", avgReport);
+        nameToAvgScore.put("期中考试", avgMidterm);
+        nameToAvgScore.put("期末考试", avgFinal);
+
+        // 四列成绩名称与权重配置的映射
+        Map<String, BigDecimal> nameToWeight = new LinkedHashMap<>();
+        GradeWeightConfig config = weightConfigRepository.findByOfferingId(offeringId).orElse(null);
+        nameToWeight.put("平时作业", config != null ? config.getDailyWeight() : new BigDecimal("0.25"));
+        nameToWeight.put("实验报告", config != null ? config.getReportWeight() : new BigDecimal("0.25"));
+        nameToWeight.put("期中考试", config != null ? config.getMidtermWeight() : new BigDecimal("0.25"));
+        nameToWeight.put("期末考试", config != null ? config.getFinalWeight() : new BigDecimal("0.25"));
+
+        for (Map.Entry<String, BigDecimal> entry : nameToAvgScore.entrySet()) {
+            String name = entry.getKey();
+            BigDecimal avgScore = entry.getValue();
+
+            AchievementReportDTO.AssessmentStructure as = new AchievementReportDTO.AssessmentStructure();
+            Assessment assessment = assessmentMap.get(name);
+            if (assessment != null) {
+                as.setAssessmentId(assessment.getId());
+                as.setLinkedObjective(objectiveNameMap.getOrDefault(assessment.getObjectiveId(), "未关联"));
+            }
+            as.setName(name);
+            as.setWeight(nameToWeight.getOrDefault(name, new BigDecimal("0.25")));
+            as.setAverageScore(avgScore);
+            as.setScoreRate(BigDecimalUtil.scoreToAchievement(avgScore));
             structures.add(as);
         }
 

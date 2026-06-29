@@ -42,7 +42,7 @@ public class AchievementReportDTO {
     public static class TeacherInfo {
         private Long teacherId;
         private String name;
-        private String department;
+        private String college;
     }
 
     @Data

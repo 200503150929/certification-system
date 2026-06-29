@@ -25,7 +25,7 @@ import java.util.Map;
  * Excel 工具类（基于 EasyExcel）
  *
  * 支持功能：
- * 1. 用户批量导入：用户名、姓名、角色、电话、邮箱、院系
+ * 1. 用户批量导入：用户名、姓名、角色、电话、邮箱、学院、专业
  * 2. 成绩批量导入：学号、分数
  * 3. 成绩导出到 Excel：学号、姓名、考核环节、分数
  */
@@ -48,11 +48,8 @@ public class ExcelUtil {
         try (InputStream in = file.getInputStream()) {
             List<List<String>> rows = readAllRows(in);
 
-            // rows 现在包含所有数据行，没有表头（因为 headRowNumber(0)）
-            // 如果使用 headRowNumber(0)，则 rows 包含所有行，包括表头
-            // 所以第一行就是数据，但你的 Excel 有表头，所以应该从第1行开始
-            int startRow = 0;
             // 检查第一行是否是表头（包含"用户名"字样）
+            int startRow = 0;
             if (!rows.isEmpty() && rows.get(0).size() > 0) {
                 String firstCell = rows.get(0).get(0);
                 if ("用户名".equals(firstCell) || firstCell.contains("用户")) {
@@ -68,12 +65,13 @@ public class ExcelUtil {
 
                 try {
                     User user = new User();
-                    user.setUsername(getCell(row, 0));
-                    user.setName(getCell(row, 1));
-                    user.setRole(getCell(row, 2));
-                    user.setPhone(getCell(row, 3));
-                    user.setEmail(getCell(row, 4));
-                    user.setDepartment(getCell(row, 5));
+                    user.setUsername(getCell(row, 0));   // 用户名/工号/学号
+                    user.setName(getCell(row, 1));       // 姓名
+                    user.setRole(getCell(row, 2));       // 角色
+                    user.setPhone(getCell(row, 3));      // 电话
+                    user.setEmail(getCell(row, 4));      // 邮箱
+                    user.setCollege(getCell(row, 5));    // 学院（原 department）
+                    user.setMajor(getCell(row, 6));      // 专业
 
                     // 基本校验
                     if (user.getUsername() == null || user.getUsername().isEmpty()) {
@@ -377,8 +375,8 @@ public class ExcelUtil {
      * @param fileName   文件名（不含后缀，自动添加 .xlsx）
      */
     public static void writeStudentGradesToExcel(List<StudentGradeExportRow> rows,
-                                                  HttpServletResponse response,
-                                                  String fileName) throws IOException {
+                                                 HttpServletResponse response,
+                                                 String fileName) throws IOException {
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("UTF-8");
         String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
