@@ -45,7 +45,6 @@ public class DashboardServiceImpl implements DashboardService {
     );
 
     private final ProgramRepository programRepository;
-    private final CourseRepository courseRepository;
     private final CourseOfferingRepository offeringRepository;
     private final IndicatorPointRepository indicatorRepository;
     private final GraduationRequirementRepository requirementRepository;
@@ -54,7 +53,6 @@ public class DashboardServiceImpl implements DashboardService {
     private final AchievementCalculationService achievementService;
 
     public DashboardServiceImpl(ProgramRepository programRepository,
-                                 CourseRepository courseRepository,
                                  CourseOfferingRepository offeringRepository,
                                  IndicatorPointRepository indicatorRepository,
                                  GraduationRequirementRepository requirementRepository,
@@ -62,7 +60,6 @@ public class DashboardServiceImpl implements DashboardService {
                                  GradeRepository gradeRepository,
                                  AchievementCalculationService achievementService) {
         this.programRepository = programRepository;
-        this.courseRepository = courseRepository;
         this.offeringRepository = offeringRepository;
         this.indicatorRepository = indicatorRepository;
         this.requirementRepository = requirementRepository;
@@ -71,30 +68,77 @@ public class DashboardServiceImpl implements DashboardService {
         this.achievementService = achievementService;
     }
 
+    // ==================== 内部辅助方法 ====================
+
+    /**
+     * 根据学年和学期解析出对应的开课记录ID集合
+     * @return 匹配的开课记录ID集合；参数为空时返回空集合（表示不过滤）
+     */
+    private Set<Long> resolveOfferingIds(String academicYear, String semester) {
+        if (academicYear == null || academicYear.isBlank()
+                || semester == null || semester.isBlank()) {
+            return Collections.emptySet();
+        }
+        return offeringRepository.findByAcademicYearAndSemester(academicYear, semester)
+                .stream()
+                .map(CourseOffering::getId)
+                .collect(Collectors.toSet());
+    }
+
+    /**
+     * 判断是否需要按学期过滤
+     */
+    private boolean hasSemesterFilter(Set<Long> offeringIds) {
+        return offeringIds != null && !offeringIds.isEmpty();
+    }
+
+    // ==================== 学期选项 ====================
+
+    @Override
+    public List<SemesterOptionDTO> getSemesterOptions() {
+        log.info("获取学期选项列表");
+        return offeringRepository.findDistinctSemesters();
+    }
+
     // ==================== KPI 指标 ====================
 
     @Override
-    public List<KpiDTO> getKpiData() {
-        log.info("获取KPI指标数据");
+    public List<KpiDTO> getKpiData(String academicYear, String semester) {
+        log.info("获取KPI指标数据，academicYear={}, semester={}", academicYear, semester);
         List<KpiDTO> result = new ArrayList<>();
+        Set<Long> offeringIds = resolveOfferingIds(academicYear, semester);
 
-        // 1. 培养方案版本数
+        // 1. 培养方案版本数（与学期无关）
         long programCount = programRepository.count();
         result.add(KpiDTO.of("培养方案版本数",
                 new BigDecimal(programCount), "个",
                 BigDecimal.ZERO, true));
 
-        // 2. 课程总数
-        long courseCount = courseRepository.count();
+        // 2. 全院课程总数（统计有开课记录的独立课程数）
+        long courseCount;
+        if (hasSemesterFilter(offeringIds)) {
+            courseCount = offeringRepository.findByAcademicYearAndSemester(academicYear, semester)
+                    .stream().map(CourseOffering::getCourseId).distinct().count();
+        } else {
+            courseCount = offeringRepository.findAll().stream()
+                    .map(CourseOffering::getCourseId).distinct().count();
+        }
         result.add(KpiDTO.of("课程总数",
                 new BigDecimal(courseCount), "门",
                 BigDecimal.ZERO, true));
 
         // 3. 当前学期教学任务
-        List<CourseOffering> allOfferings = offeringRepository.findAll();
-        // 简化：取最新学年学期的开课数
-        long currentOfferingCount = allOfferings.size();
-        result.add(KpiDTO.of("当前学期教学任务",
+        long currentOfferingCount;
+        String taskLabel;
+        if (hasSemesterFilter(offeringIds)) {
+            currentOfferingCount = offeringIds.size();
+            taskLabel = academicYear + " " + semester + "教学任务";
+        } else {
+            List<CourseOffering> allOfferings = offeringRepository.findAll();
+            currentOfferingCount = allOfferings.size();
+            taskLabel = "当前学期教学任务";
+        }
+        result.add(KpiDTO.of(taskLabel,
                 new BigDecimal(currentOfferingCount), "门次",
                 BigDecimal.ZERO, true));
 
@@ -103,7 +147,12 @@ public class DashboardServiceImpl implements DashboardService {
         if (!allIndicators.isEmpty()) {
             int passedCount = 0;
             for (IndicatorPoint indicator : allIndicators) {
-                IndicatorAchievementDTO dto = achievementService.calculateIndicatorAchievement(indicator.getId());
+                IndicatorAchievementDTO dto;
+                if (hasSemesterFilter(offeringIds)) {
+                    dto = achievementService.calculateIndicatorAchievement(indicator.getId(), offeringIds);
+                } else {
+                    dto = achievementService.calculateIndicatorAchievement(indicator.getId());
+                }
                 if (dto != null && dto.isPassed()) {
                     passedCount++;
                 }
@@ -127,8 +176,9 @@ public class DashboardServiceImpl implements DashboardService {
     // ==================== 柱状图 ====================
 
     @Override
-    public List<BarChartDTO> getBarChartData(Long programId) {
-        log.info("获取柱状图数据，programId={}", programId);
+    public List<BarChartDTO> getBarChartData(Long programId, String academicYear, String semester) {
+        log.info("获取柱状图数据，programId={}, academicYear={}, semester={}", programId, academicYear, semester);
+        Set<Long> offeringIds = resolveOfferingIds(academicYear, semester);
 
         List<BarChartDTO> result = new ArrayList<>();
 
@@ -144,8 +194,15 @@ public class DashboardServiceImpl implements DashboardService {
         for (GraduationRequirement req : requirements) {
             List<IndicatorPoint> indicators = indicatorRepository.findByRequirementId(req.getId());
             for (IndicatorPoint indicator : indicators) {
-                IndicatorAchievementDTO dto = achievementService.calculateIndicatorAchievement(indicator.getId());
-                BigDecimal value = (dto != null) ? dto.getAchievement() : BigDecimal.ZERO;
+                IndicatorAchievementDTO dto;
+                if (hasSemesterFilter(offeringIds)) {
+                    dto = achievementService.calculateIndicatorAchievement(indicator.getId(), offeringIds);
+                } else {
+                    dto = achievementService.calculateIndicatorAchievement(indicator.getId());
+                }
+                BigDecimal value = (dto != null)
+                        ? dto.getAchievement().multiply(new BigDecimal("100"))
+                        : BigDecimal.ZERO;
                 result.add(BarChartDTO.of(indicator.getCode(), value));
             }
         }
@@ -156,8 +213,9 @@ public class DashboardServiceImpl implements DashboardService {
     // ==================== 雷达图 ====================
 
     @Override
-    public RadarChartDTO getRadarChartData(Long programId) {
-        log.info("获取雷达图数据，programId={}", programId);
+    public RadarChartDTO getRadarChartData(Long programId, String academicYear, String semester) {
+        log.info("获取雷达图数据，programId={}, academicYear={}, semester={}", programId, academicYear, semester);
+        Set<Long> offeringIds = resolveOfferingIds(academicYear, semester);
 
         List<String> dimensionNames = new ArrayList<>(DIMENSION_PREFIX_MAP.keySet());
         List<BigDecimal> dimensionValues = new ArrayList<>();
@@ -182,19 +240,25 @@ public class DashboardServiceImpl implements DashboardService {
             if (dimName == null) continue;
 
             // 计算该毕业要求的达成度
-            GraduationAchievementDTO gradDTO = achievementService.calculateGraduationAchievement(req.getId());
+            GraduationAchievementDTO gradDTO;
+            if (hasSemesterFilter(offeringIds)) {
+                gradDTO = achievementService.calculateGraduationAchievement(req.getId(), offeringIds);
+            } else {
+                gradDTO = achievementService.calculateGraduationAchievement(req.getId());
+            }
             if (gradDTO != null && gradDTO.getOverallAchievement() != null) {
                 dimensionAchievements.get(dimName).add(gradDTO.getOverallAchievement());
             }
         }
 
-        // 计算每个维度的平均达成度
+        // 计算每个维度的平均达成度（×100 转为百分比，匹配前端 max=100）
         for (String dimName : dimensionNames) {
             List<BigDecimal> achievements = dimensionAchievements.get(dimName);
             if (achievements.isEmpty()) {
                 dimensionValues.add(BigDecimal.ZERO);
             } else {
-                dimensionValues.add(BigDecimalUtil.avg(achievements));
+                dimensionValues.add(BigDecimalUtil.avg(achievements)
+                        .multiply(new BigDecimal("100")));
             }
         }
 
@@ -221,15 +285,42 @@ public class DashboardServiceImpl implements DashboardService {
     // ==================== 成绩分布 ====================
 
     @Override
-    public List<GradeDistributionDTO> getGradeDistribution() {
-        log.info("获取全院成绩分布");
+    public List<GradeDistributionDTO> getGradeDistribution(String academicYear, String semester) {
+        log.info("获取全院成绩分布，academicYear={}, semester={}", academicYear, semester);
+        Set<Long> offeringIds = resolveOfferingIds(academicYear, semester);
 
-        // 查询所有课程的平均成绩
-        List<CourseOffering> offerings = offeringRepository.findAll();
+        // 查询符合条件的开课记录
+        List<CourseOffering> offerings;
+        if (hasSemesterFilter(offeringIds)) {
+            offerings = offeringRepository.findByAcademicYearAndSemester(academicYear, semester);
+        } else {
+            offerings = offeringRepository.findAll();
+        }
+
+        if (offerings.isEmpty()) {
+            List<GradeDistributionDTO> result = new ArrayList<>();
+            for (GradeRange range : GRADE_RANGES) {
+                GradeDistributionDTO dto = new GradeDistributionDTO();
+                dto.setRange(range.range);
+                dto.setLabel(range.label);
+                dto.setCount(0);
+                result.add(dto);
+            }
+            return result;
+        }
+
+        // 批量加载所有考核环节，按 offeringId 分组
+        List<Long> allOfferingIds = offerings.stream()
+                .map(CourseOffering::getId)
+                .collect(Collectors.toList());
+        Map<Long, List<Assessment>> assessmentsByOffering = assessmentRepository
+                .findByOfferingIdIn(allOfferingIds).stream()
+                .collect(Collectors.groupingBy(Assessment::getOfferingId));
+
         Map<Long, BigDecimal> courseAvgScores = new HashMap<>();
 
         for (CourseOffering offering : offerings) {
-            List<Assessment> assessments = assessmentRepository.findByOfferingId(offering.getId());
+            List<Assessment> assessments = assessmentsByOffering.getOrDefault(offering.getId(), Collections.emptyList());
             List<Long> assessmentIds = assessments.stream()
                     .map(Assessment::getId)
                     .collect(Collectors.toList());
@@ -275,11 +366,18 @@ public class DashboardServiceImpl implements DashboardService {
     // ==================== 考核环节得分率 ====================
 
     @Override
-    public List<AssessmentScoreRateDTO> getAssessmentScoreRates() {
-        log.info("获取考核环节平均得分率");
+    public List<AssessmentScoreRateDTO> getAssessmentScoreRates(String academicYear, String semester) {
+        log.info("获取考核环节平均得分率，academicYear={}, semester={}", academicYear, semester);
+        Set<Long> offeringIds = resolveOfferingIds(academicYear, semester);
 
-        // 查询所有考核环节
-        List<Assessment> allAssessments = assessmentRepository.findAll();
+        // 查询考核环节
+        List<Assessment> allAssessments;
+        if (hasSemesterFilter(offeringIds)) {
+            allAssessments = assessmentRepository.findByOfferingIdIn(new ArrayList<>(offeringIds));
+        } else {
+            allAssessments = assessmentRepository.findAll();
+        }
+
         if (allAssessments.isEmpty()) {
             return Collections.emptyList();
         }

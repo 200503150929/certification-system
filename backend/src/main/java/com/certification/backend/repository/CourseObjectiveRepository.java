@@ -21,4 +21,9 @@ public interface CourseObjectiveRepository extends JpaRepository<CourseObjective
      * 根据开课ID删除所有课程目标
      */
     void deleteByOfferingId(Long offeringId);
+
+    /**
+     * 根据开课ID列表批量查询课程目标
+     */
+    List<CourseObjective> findByOfferingIdIn(List<Long> offeringIds);
 }

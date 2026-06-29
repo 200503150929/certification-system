@@ -212,6 +212,9 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
         courseRepository.findById(offering.getCourseId()).ifPresent(c -> {
             resp.setCourseCode(c.getCode());
             resp.setCourseName(c.getName());
+            resp.setCredits(c.getCredits());
+            resp.setCourseType(c.getCourseType());
+            resp.setIsRequired(c.getIsRequired());
         });
 
         userRepository.findById(offering.getTeacherId()).ifPresent(u ->

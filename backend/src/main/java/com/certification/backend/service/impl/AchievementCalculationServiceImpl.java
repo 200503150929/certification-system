@@ -215,7 +215,21 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
 
     @Override
     public IndicatorAchievementDTO calculateIndicatorAchievement(Long indicatorId) {
-        log.info("计算指标点 [{}] 的达成度", indicatorId);
+        return calculateIndicatorAchievementInternal(indicatorId, null);
+    }
+
+    @Override
+    public IndicatorAchievementDTO calculateIndicatorAchievement(Long indicatorId, Set<Long> offeringIds) {
+        return calculateIndicatorAchievementInternal(indicatorId, offeringIds);
+    }
+
+    /**
+     * 计算指标点达成度的内部实现
+     * @param indicatorId 指标点ID
+     * @param offeringIds 限定开课记录ID集合，null或空表示不限
+     */
+    private IndicatorAchievementDTO calculateIndicatorAchievementInternal(Long indicatorId, Set<Long> offeringIds) {
+        log.info("计算指标点 [{}] 的达成度，offeringIds={}", indicatorId, offeringIds);
 
         // 1. 查询指标点信息
         IndicatorPoint indicator = indicatorRepository.findById(indicatorId)
@@ -229,6 +243,22 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         List<ObjectiveIndicatorMatrix> matrices = oiMatrixRepository.findByIndicatorId(indicatorId);
         if (matrices.isEmpty()) {
             log.info("指标点 [{}] 没有支撑的课程目标", indicatorId);
+            return buildEmptyIndicatorDTO(indicator);
+        }
+
+        // 2a. 如果指定了开课范围，过滤只保留属于这些开课的课程目标
+        if (offeringIds != null && !offeringIds.isEmpty()) {
+            Set<Long> allowedObjectiveIds = objectiveRepository
+                    .findByOfferingIdIn(new ArrayList<>(offeringIds)).stream()
+                    .map(CourseObjective::getId)
+                    .collect(Collectors.toSet());
+            matrices = matrices.stream()
+                    .filter(m -> allowedObjectiveIds.contains(m.getObjectiveId()))
+                    .collect(Collectors.toList());
+        }
+
+        if (matrices.isEmpty()) {
+            log.info("指标点 [{}] 在指定范围内没有支撑的课程目标", indicatorId);
             return buildEmptyIndicatorDTO(indicator);
         }
 
@@ -365,7 +395,21 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
 
     @Override
     public GraduationAchievementDTO calculateGraduationAchievement(Long requirementId) {
-        log.info("计算毕业要求 [{}] 的达成度", requirementId);
+        return calculateGraduationAchievementInternal(requirementId, null);
+    }
+
+    @Override
+    public GraduationAchievementDTO calculateGraduationAchievement(Long requirementId, Set<Long> offeringIds) {
+        return calculateGraduationAchievementInternal(requirementId, offeringIds);
+    }
+
+    /**
+     * 计算毕业要求达成度的内部实现
+     * @param requirementId 毕业要求ID
+     * @param offeringIds 限定开课记录ID集合，null或空表示不限
+     */
+    private GraduationAchievementDTO calculateGraduationAchievementInternal(Long requirementId, Set<Long> offeringIds) {
+        log.info("计算毕业要求 [{}] 的达成度，offeringIds={}", requirementId, offeringIds);
 
         GraduationRequirement requirement = requirementRepository.findById(requirementId).orElse(null);
         if (requirement == null) {
@@ -385,7 +429,7 @@ public class AchievementCalculationServiceImpl implements AchievementCalculation
         boolean allPassed = true;
 
         for (IndicatorPoint indicator : indicators) {
-            IndicatorAchievementDTO indicatorDTO = calculateIndicatorAchievement(indicator.getId());
+            IndicatorAchievementDTO indicatorDTO = calculateIndicatorAchievementInternal(indicator.getId(), offeringIds);
 
             GraduationAchievementDTO.IndicatorDetail detail = new GraduationAchievementDTO.IndicatorDetail();
             detail.setIndicatorId(indicator.getId());

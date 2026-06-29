@@ -116,12 +116,12 @@ const loadCourses = async () => {
           courseId: item.courseId,
           courseCode: item.courseCode,
           courseName: item.courseName,
-          credits: null,
+          credits: item.credits,
           teacherName: item.teacherName,
           academicYear: item.academicYear,
           semester: item.semester,
-          courseType: null,
-          isRequired: null
+          courseType: item.courseType,
+          isRequired: item.isRequired
         }));
       }
     } else {

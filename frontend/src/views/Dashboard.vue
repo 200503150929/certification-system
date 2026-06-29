@@ -3,11 +3,15 @@
     <div class="dashboard-header">
       <div>
         <h2>工程教育认证数据看板</h2>
-        <p>面向管理员查看的全周期教学数据</p>
+        <p>全周期教学数据</p>
       </div>
       <div>
         <el-select v-model="selectedProgramId" placeholder="选择培养方案" clearable style="width: 220px; margin-right: 10px" @change="onProgramChange">
           <el-option v-for="p in programOptions" :key="p.id" :label="p.majorName" :value="p.id" />
+        </el-select>
+        <el-select v-model="selectedSemester" placeholder="选择学期" clearable style="width: 220px; margin-right: 10px" @change="onSemesterChange">
+          <el-option label="全部学期" value="" />
+          <el-option v-for="s in semesterOptions" :key="s.value" :label="s.label" :value="s.value" />
         </el-select>
         <el-button :icon="Refresh" circle @click="refreshAll" :loading="loading" />
       </div>
@@ -71,6 +75,8 @@ import request from '@/api/request'
 const loading = ref(false)
 const selectedProgramId = ref(null)
 const programOptions = ref([])
+const selectedSemester = ref('')
+const semesterOptions = ref([])
 
 const kpiData = ref([])
 
@@ -92,6 +98,35 @@ const formatNumber = (val) => {
   return num.toFixed(1)
 }
 
+/**
+ * 构建通用查询参数：培养方案 + 学期
+ */
+const buildParams = () => {
+  const params = {}
+  if (selectedProgramId.value) {
+    params.programId = selectedProgramId.value
+  }
+  if (selectedSemester.value) {
+    const parts = selectedSemester.value.split('_')
+    params.academicYear = parts[0]
+    params.semester = parts[1]
+  }
+  return params
+}
+
+/**
+ * 仅构建学期参数（KPI、成绩分布、考核得分率不用 programId）
+ */
+const buildSemesterParams = () => {
+  const params = {}
+  if (selectedSemester.value) {
+    const parts = selectedSemester.value.split('_')
+    params.academicYear = parts[0]
+    params.semester = parts[1]
+  }
+  return params
+}
+
 // ============ 加载培养方案选项 ============
 const fetchProgramOptions = async () => {
   try {
@@ -104,10 +139,23 @@ const fetchProgramOptions = async () => {
   }
 }
 
+// ============ 加载学期选项 ============
+const fetchSemesterOptions = async () => {
+  try {
+    const res = await request.get('/dashboard/semester-options')
+    if (res.status === 'success' && res.data) {
+      semesterOptions.value = res.data
+    }
+  } catch (e) {
+    // 忽略
+  }
+}
+
 // ============ 加载 KPI ============
 const fetchKpi = async () => {
   try {
-    const res = await request.get('/dashboard/kpi')
+    const params = buildSemesterParams()
+    const res = await request.get('/dashboard/kpi', { params })
     if (res.status === 'success' && res.data) {
       kpiData.value = res.data
     }
@@ -119,7 +167,7 @@ const fetchKpi = async () => {
 // ============ 柱状图 ============
 const fetchBarChart = async () => {
   try {
-    const params = selectedProgramId.value ? { programId: selectedProgramId.value } : {}
+    const params = buildParams()
     const res = await request.get('/dashboard/bar-chart', { params })
     if (res.status === 'success' && res.data) {
       const data = res.data
@@ -152,7 +200,7 @@ const fetchBarChart = async () => {
 // ============ 雷达图 ============
 const fetchRadarChart = async () => {
   try {
-    const params = selectedProgramId.value ? { programId: selectedProgramId.value } : {}
+    const params = buildParams()
     const res = await request.get('/dashboard/radar-chart', { params })
     if (res.status === 'success' && res.data) {
       const data = res.data
@@ -177,7 +225,8 @@ const fetchRadarChart = async () => {
 // ============ 成绩分布 ============
 const fetchGradeDistribution = async () => {
   try {
-    const res = await request.get('/dashboard/grade-distribution')
+    const params = buildSemesterParams()
+    const res = await request.get('/dashboard/grade-distribution', { params })
     if (res.status === 'success' && res.data) {
       const data = res.data
       gradeDistInstance.setOption({
@@ -203,7 +252,8 @@ const fetchGradeDistribution = async () => {
 // ============ 考核得分率 ============
 const fetchAssessmentRates = async () => {
   try {
-    const res = await request.get('/dashboard/assessment-score-rates')
+    const params = buildSemesterParams()
+    const res = await request.get('/dashboard/assessment-score-rates', { params })
     if (res.status === 'success' && res.data) {
       const data = res.data
       assessmentInstance.setOption({
@@ -248,13 +298,16 @@ const refreshAll = async () => {
 }
 
 const onProgramChange = () => {
-  fetchBarChart()
-  fetchRadarChart()
+  refreshAll()
+}
+
+const onSemesterChange = () => {
+  refreshAll()
 }
 
 // ============ 初始化 ============
 onMounted(async () => {
-  await fetchProgramOptions()
+  await Promise.all([fetchProgramOptions(), fetchSemesterOptions()])
   await nextTick()
 
   // 初始化 ECharts 实例

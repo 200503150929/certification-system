@@ -22,4 +22,17 @@ public interface CourseOfferingRepository extends JpaRepository<CourseOffering, 
     boolean existsByCourseIdAndTeacherIdAndAcademicYearAndSemesterAndIdNot(Long courseId, Long teacherId, String academicYear, String semester, Long id);
 
     void deleteByCourseId(Long courseId);
+
+    /**
+     * 查询所有不重复的学年-学期组合（用于看板学期下拉选项）
+     */
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT new com.certification.backend.dto.response.SemesterOptionDTO(" +
+            "co.academicYear, co.semester) " +
+            "FROM CourseOffering co ORDER BY co.academicYear DESC, co.semester DESC")
+    List<com.certification.backend.dto.response.SemesterOptionDTO> findDistinctSemesters();
+
+    /**
+     * 按学年和学期查询开课记录
+     */
+    List<CourseOffering> findByAcademicYearAndSemester(String academicYear, String semester);
 }
