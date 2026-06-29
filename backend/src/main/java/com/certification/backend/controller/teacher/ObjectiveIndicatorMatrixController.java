@@ -20,7 +20,7 @@ import java.util.List;
 @Tag(name = "10-课程目标-指标点支撑矩阵", description = "教师端课程目标与指标点支撑矩阵的查询与批量保存")
 @RestController
 @RequestMapping("/teacher/objectives")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAuthority('course:set-goals')")
 public class ObjectiveIndicatorMatrixController {
 
     private final ObjectiveIndicatorMatrixService matrixService;

@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "09-教师端课程基本信息管理", description = "教师端课程基本信息的增删改查")
 @RestController
 @RequestMapping("/teacher/courses")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAuthority('course:teach')")
 public class TeacherCourseController {
 
     private final CourseService courseService;

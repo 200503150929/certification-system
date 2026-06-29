@@ -19,7 +19,7 @@ import java.util.List;
 @Tag(name = "06-考核管理", description = "教师端考核方式的增删查")
 @RestController
 @RequestMapping("/teacher/assessments")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAuthority('course:set-assessment')")
 public class AssessmentController {
 
     private final AssessmentService assessmentService;

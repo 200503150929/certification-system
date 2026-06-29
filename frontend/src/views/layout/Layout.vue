@@ -1,13 +1,14 @@
 <template>
   <el-container class="layout-container">
-    <!-- 侧边栏 -->
     <el-aside :width="isCollapse ? '64px' : '220px'">
       <div class="sidebar-header">
         <el-icon><School /></el-icon>
         <span v-if="!isCollapse">工程系统</span>
       </div>
 
+      <!-- 关键：添加 :key="authStore.menuVersion" -->
       <el-menu
+          :key="authStore.menuVersion"
           active-text-color="#ffd04b"
           background-color="#001529"
           class="el-menu-vertical-demo"
@@ -17,19 +18,16 @@
           :collapse="isCollapse"
           :collapse-transition="false"
       >
-        <!-- 仪表盘 -->
         <el-menu-item v-permission="'dashboard:view'" index="/dashboard">
           <el-icon><Monitor /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
 
-        <!-- 个人信息 -->
         <el-menu-item v-permission="'profile:view'" index="/app/profile">
           <el-icon><User /></el-icon>
           <span>个人信息</span>
         </el-menu-item>
 
-        <!-- 我的课程 / 课程管理（管理员不显示） -->
         <el-menu-item
             v-if="userRole !== 'admin' && userRole !== 'ADMIN'"
             v-permission="'course:list'"
@@ -39,13 +37,11 @@
           <span>{{ userRole === 'student' ? '我的课程' : '课程管理' }}</span>
         </el-menu-item>
 
-        <!-- 人才培养方案管理（仅管理员） -->
         <el-menu-item v-permission="'program:manage'" index="/app/curriculum/management">
           <el-icon><DocumentCopy /></el-icon>
           <span>人才培养方案管理</span>
         </el-menu-item>
 
-        <!-- 人才培养方案查看（教师/学生只读）- 管理员不显示 -->
         <el-menu-item
             v-if="userRole !== 'admin' && userRole !== 'ADMIN'"
             v-permission="'program:view'"
@@ -55,20 +51,17 @@
           <span>人才培养方案</span>
         </el-menu-item>
 
-        <!-- 用户管理（仅管理员） -->
         <el-menu-item v-permission="'user:list'" index="/app/users">
           <el-icon><User /></el-icon>
           <span>用户管理</span>
         </el-menu-item>
 
-        <!-- 角色权限管理（仅管理员） -->
         <el-menu-item v-permission="'role:list'" index="/app/roles">
           <el-icon><Connection /></el-icon>
           <span>角色权限管理</span>
         </el-menu-item>
       </el-menu>
 
-      <!-- 侧边栏底部：用户信息 + 折叠按钮 -->
       <div class="sidebar-footer">
         <div class="user-info-wrapper">
           <el-avatar :size="isCollapse ? 32 : 40" :icon="UserFilled" />
@@ -77,26 +70,19 @@
             <p class="user-role">{{ userRole }}</p>
           </div>
         </div>
-        <el-button
-            class="collapse-btn"
-            text
-            @click="toggleCollapse"
-        >
+        <el-button class="collapse-btn" text @click="toggleCollapse">
           <el-icon v-if="isCollapse"><Expand /></el-icon>
           <el-icon v-else><Fold /></el-icon>
         </el-button>
       </div>
     </el-aside>
 
-    <!-- 主内容区 -->
     <el-container>
-      <!-- 顶部导航 -->
       <el-header>
         <div class="header-left">
           <el-button text @click="toggleCollapse" style="padding: 0 8px">
             <el-icon><Fold v-if="!isCollapse" /><Expand v-else /></el-icon>
           </el-button>
-          <!-- 面包屑 -->
           <el-breadcrumb separator="/">
             <el-breadcrumb-item :to="{ path: '/' }">首页</el-breadcrumb-item>
             <el-breadcrumb-item
@@ -110,12 +96,10 @@
         </div>
 
         <div class="header-right">
-          <!-- 通知 -->
           <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
             <el-icon class="header-icon"><Bell /></el-icon>
           </el-badge>
 
-          <!-- 用户下拉菜单 -->
           <el-dropdown @command="handleCommand">
             <span class="el-dropdown-link">
               {{ userInfo.name || '用户' }}
@@ -137,10 +121,9 @@
         </div>
       </el-header>
 
-      <!-- 内容区域 -->
       <el-main>
         <router-view v-slot="{ Component }">
-          <keep-alive :include="['CurriculumManagement', 'ProgramDetail', 'CurriculumView', 'ProgramView', 'CurriculumGoals', 'CurriculumRequirements', 'CurriculumIndicators', 'CurriculumMatrix']">
+          <keep-alive :include="['CurriculumManagement', 'ProgramDetail', 'CurriculumView', 'ProgramView']">
             <component :is="Component" />
           </keep-alive>
         </router-view>
@@ -154,19 +137,9 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
-  School,
-  Monitor,
-  Connection,
-  User,
-  Bell,
-  ArrowDown,
-  UserFilled,
-  Document,
-  DocumentCopy,
-  Expand,
-  Fold,
-  Lock,
-  SwitchButton
+  School, Monitor, Connection, User, Bell, ArrowDown,
+  UserFilled, Document, DocumentCopy, Expand, Fold,
+  Lock, SwitchButton
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
@@ -174,230 +147,77 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
-// ============ 状态 ============
 const isCollapse = ref(false)
 const notificationCount = ref(3)
 
-// ============ 用户信息 ============
-const userInfo = ref({
-  name: '',
-  role: ''
-})
+const userInfo = ref({ name: '', role: '' })
 
-const userRole = computed(() => authStore.userRole || userInfo.value.role)
-const userName = computed(() => authStore.userName || userInfo.value.name)
+const userRole = computed(() => authStore.userInfo?.role || userInfo.value.role)
+const userName = computed(() => authStore.userInfo?.name || userInfo.value.name)
 
-// ============ 面包屑配置 ============
 const breadcrumbConfig = {
-  // 仪表盘
-  '/dashboard': {
-    items: [{ name: '仪表盘' }]
-  },
-
-  // 个人信息
-  '/app/profile': {
-    items: [{ name: '个人信息' }]
-  },
-
-  // 我的课程
-  '/app/my-courses': {
-    items: [{ name: '我的课程' }]
-  },
-
-  // 课程管理（动态路由）
-  '/app/courses/program': {
-    items: [
-      { name: '课程管理' }
-    ]
-  },
-
-  // 课程详情（学生端）
-  '/app/course': {
-    items: [
-      { name: '我的课程', path: '/app/my-courses' },
-      { name: '课程详情' }
-    ]
-  },
-
-  // 课程管理详情（教师端）
-  '/app/teacher/course': {
-    items: [
-      { name: '课程管理', path: '/app/my-courses' },
-      { name: '课程管理' }
-    ]
-  },
-
-  // 学生名单
-  '/app/course/:id/students': {
-    items: [
-      { name: '课程管理', path: '/app/my-courses' },
-      { name: '学生名单' }
-    ]
-  },
-
-  // 人才培养方案管理（管理员）
-  '/app/curriculum/management': {
-    items: [{ name: '人才培养方案管理' }]
-  },
-
-  // 专业详情（管理员）
-  '/app/curriculum/detail': {
-    items: [
-      { name: '人才培养方案管理', path: '/app/curriculum/management' },
-      { name: '专业详情' }
-    ]
-  },
-
-  // 人才培养方案查看（教师/学生）
-  '/app/curriculum/view': {
-    items: [{ name: '人才培养方案' }]
-  },
-
-  // 专业详情查看（教师/学生）
-  '/app/curriculum/view/:id': {
-    items: [
-      { name: '人才培养方案', path: '/app/curriculum/view' },
-      { name: '专业详情' }
-    ]
-  },
-
-  // 用户管理
-  '/app/users': {
-    items: [{ name: '用户管理' }]
-  },
-
-  // 角色权限管理
-  '/app/roles': {
-    items: [{ name: '角色权限管理' }]
-  },
-
-  // 修改密码
-  '/app/changePassword': {
-    items: [
-      { name: '个人信息', path: '/app/profile' },
-      { name: '修改密码' }
-    ]
-  }
+  '/dashboard': { items: [{ name: '仪表盘' }] },
+  '/app/profile': { items: [{ name: '个人信息' }] },
+  '/app/my-courses': { items: [{ name: '我的课程' }] },
+  '/app/courses/program': { items: [{ name: '课程管理' }] },
+  '/app/course': { items: [{ name: '我的课程', path: '/app/my-courses' }, { name: '课程详情' }] },
+  '/app/teacher/course': { items: [{ name: '课程管理', path: '/app/my-courses' }, { name: '课程管理' }] },
+  '/app/course/:id/students': { items: [{ name: '课程管理', path: '/app/my-courses' }, { name: '学生名单' }] },
+  '/app/curriculum/management': { items: [{ name: '人才培养方案管理' }] },
+  '/app/curriculum/detail': { items: [{ name: '人才培养方案管理', path: '/app/curriculum/management' }, { name: '专业详情' }] },
+  '/app/curriculum/view': { items: [{ name: '人才培养方案' }] },
+  '/app/curriculum/view/:id': { items: [{ name: '人才培养方案', path: '/app/curriculum/view' }, { name: '专业详情' }] },
+  '/app/users': { items: [{ name: '用户管理' }] },
+  '/app/roles': { items: [{ name: '角色权限管理' }] },
+  '/app/changePassword': { items: [{ name: '个人信息', path: '/app/profile' }, { name: '修改密码' }] }
 }
 
-// 动态匹配面包屑配置（支持带参数的路由）
 const getBreadcrumbConfig = (path) => {
-  // 精确匹配
-  if (breadcrumbConfig[path]) {
-    return breadcrumbConfig[path]
-  }
-
-  // 动态路由匹配 - 课程管理
-  if (path.startsWith('/app/courses/program/')) {
-    return {
-      items: [{ name: '课程管理' }]
-    }
-  }
-
-  // 动态路由匹配 - 课程详情（学生端）
+  if (breadcrumbConfig[path]) return breadcrumbConfig[path]
+  if (path.startsWith('/app/courses/program/')) return { items: [{ name: '课程管理' }] }
   if (path.startsWith('/app/course/') && !path.includes('/students')) {
-    return {
-      items: [
-        { name: '我的课程', path: '/app/my-courses' },
-        { name: '课程详情' }
-      ]
-    }
+    return { items: [{ name: '我的课程', path: '/app/my-courses' }, { name: '课程详情' }] }
   }
-
-  // 动态路由匹配 - 课程管理详情（教师端）
   if (path.startsWith('/app/teacher/course/')) {
-    return {
-      items: [
-        { name: '课程管理', path: '/app/my-courses' },
-        { name: '课程管理' }
-      ]
-    }
+    return { items: [{ name: '课程管理', path: '/app/my-courses' }, { name: '课程管理' }] }
   }
-
-  // 动态路由匹配 - 学生名单
   if (path.includes('/students')) {
-    return {
-      items: [
-        { name: '课程管理', path: '/app/my-courses' },
-        { name: '学生名单' }
-      ]
-    }
+    return { items: [{ name: '课程管理', path: '/app/my-courses' }, { name: '学生名单' }] }
   }
-
-  // 动态路由匹配 - 专业详情（管理员）
   if (path.startsWith('/app/curriculum/detail/')) {
-    return {
-      items: [
-        { name: '人才培养方案管理', path: '/app/curriculum/management' },
-        { name: '专业详情' }
-      ]
-    }
+    return { items: [{ name: '人才培养方案管理', path: '/app/curriculum/management' }, { name: '专业详情' }] }
   }
-
-  // 动态路由匹配 - 专业详情查看（教师/学生）
   if (path.startsWith('/app/curriculum/view/')) {
-    return {
-      items: [
-        { name: '人才培养方案', path: '/app/curriculum/view' },
-        { name: '专业详情' }
-      ]
-    }
+    return { items: [{ name: '人才培养方案', path: '/app/curriculum/view' }, { name: '专业详情' }] }
   }
-
-  // 默认：只显示当前路由名称
-  return {
-    items: [{ name: route.meta?.title || route.name || '未知页面' }]
-  }
+  return { items: [{ name: route.meta?.title || route.name || '未知页面' }] }
 }
 
-// ============ 计算属性 ============
-// 计算面包屑数据
 const breadcrumbItems = computed(() => {
   const config = getBreadcrumbConfig(route.path)
   return config.items || [{ name: route.meta?.title || route.name || '未知页面' }]
 })
 
-// 当前激活菜单
 const activeMenu = computed(() => {
-  // 仪表盘
   if (route.path === '/dashboard') return '/dashboard'
-
-  // 个人信息
   if (route.path === '/app/profile') return '/app/profile'
-
-  // 我的课程
   if (route.path === '/app/my-courses') return '/app/my-courses'
-
-  // 课程管理相关页面 - 高亮"我的课程"
   if (route.path.startsWith('/app/courses/')) return '/app/my-courses'
   if (route.path.startsWith('/app/course/')) return '/app/my-courses'
   if (route.path.startsWith('/app/teacher/')) return '/app/my-courses'
-
-  // 人才培养方案管理相关页面 - 高亮"人才培养方案管理"
   if (route.path.startsWith('/app/curriculum/detail/')) return '/app/curriculum/management'
   if (route.path.startsWith('/app/curriculum/management')) return '/app/curriculum/management'
-
-  // 人才培养方案查看相关页面 - 高亮"人才培养方案"
   if (route.path.startsWith('/app/curriculum/view/')) return '/app/curriculum/view'
-
-  // 用户管理
   if (route.path === '/app/users') return '/app/users'
-
-  // 角色权限管理
   if (route.path === '/app/roles') return '/app/roles'
-
-  // 修改密码 - 高亮"个人信息"
   if (route.path === '/app/changePassword') return '/app/profile'
-
   return route.path
 })
 
-// ============ 方法 ============
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
 }
 
-// 下拉菜单命令处理
 const handleCommand = (command) => {
   switch (command) {
     case 'changePassword':
@@ -411,41 +231,32 @@ const handleCommand = (command) => {
   }
 }
 
-// 退出登录方法
 const handleLogout = () => {
-  ElMessageBox.confirm(
-      '确定要退出登录吗？',
-      '退出确认',
-      {
-        confirmButtonText: '确定退出',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-  ).then(() => {
+  ElMessageBox.confirm('确定要退出登录吗？', '退出确认', {
+    confirmButtonText: '确定退出',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(() => {
     authStore.logout()
     ElMessage.success('已安全退出')
+    router.push('/login')
   }).catch(() => {})
 }
 
-// ============ 加载用户信息 ============
 const loadUserInfo = () => {
-  userInfo.value.name = authStore.userName
-  userInfo.value.role = authStore.userRole
+  userInfo.value.name = authStore.userInfo?.name || ''
+  userInfo.value.role = authStore.userInfo?.role || ''
 }
 
-// ============ 生命周期 ============
 onMounted(() => {
   loadUserInfo()
 })
 </script>
 
 <style scoped>
-/* ========== 整体布局 ========== */
 .layout-container {
   height: 100vh;
 }
-
-/* ========== 侧边栏 ========== */
 .el-aside {
   background-color: #001529;
   color: white;
@@ -455,7 +266,6 @@ onMounted(() => {
   overflow: hidden;
   flex-shrink: 0;
 }
-
 .sidebar-header {
   display: flex;
   align-items: center;
@@ -475,8 +285,6 @@ onMounted(() => {
 .sidebar-header span {
   transition: opacity 0.3s;
 }
-
-/* 菜单样式 */
 .el-menu {
   border-right: none;
   flex: 1;
@@ -489,8 +297,6 @@ onMounted(() => {
 .el-menu .el-menu-item.is-active {
   background-color: rgba(64, 158, 255, 0.2) !important;
 }
-
-/* 侧边栏底部 */
 .sidebar-footer {
   padding: 12px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.05);
@@ -530,8 +336,6 @@ onMounted(() => {
 .collapse-btn:hover {
   color: #fff;
 }
-
-/* ========== 顶部导航 ========== */
 .el-header {
   background-color: #fff;
   display: flex;
@@ -572,7 +376,6 @@ onMounted(() => {
   color: #66b1ff;
   text-decoration: underline;
 }
-
 .header-right {
   display: flex;
   align-items: center;
@@ -600,16 +403,12 @@ onMounted(() => {
 .el-dropdown-link:hover {
   color: #409EFF;
 }
-
-/* ========== 主内容 ========== */
 .el-main {
   background-color: #f0f2f5;
   padding: 10px;
   overflow-y: auto;
   flex: 1;
 }
-
-/* ========== 下拉菜单图标样式 ========== */
 .el-dropdown-menu .el-dropdown-item {
   display: flex;
   align-items: center;
@@ -618,8 +417,6 @@ onMounted(() => {
 .el-dropdown-menu .el-dropdown-item .el-icon {
   font-size: 16px;
 }
-
-/* ========== 滚动条美化 ========== */
 .el-main::-webkit-scrollbar,
 .el-menu::-webkit-scrollbar {
   width: 4px;
@@ -633,8 +430,6 @@ onMounted(() => {
 .el-menu::-webkit-scrollbar-thumb:hover {
   background: #a8b0b8;
 }
-
-/* ========== 响应式 ========== */
 @media (max-width: 768px) {
   .el-aside {
     width: 64px !important;

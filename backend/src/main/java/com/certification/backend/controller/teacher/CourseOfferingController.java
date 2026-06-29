@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @Tag(name = "04-开课信息管理", description = "教师端开课记录的增删改查")
 @RestController
 @RequestMapping("/teacher/offering")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAuthority('course:teach')")
 public class CourseOfferingController {
 
     private final CourseOfferingService courseOfferingService;

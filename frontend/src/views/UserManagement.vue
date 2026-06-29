@@ -28,8 +28,8 @@
               <el-option label="正常" :value="1" />
               <el-option label="已禁用" :value="0" />
             </el-select>
-            <el-button type="primary" :icon="Upload" @click="handleImport">批量导入</el-button>
-            <el-button type="primary" :icon="Plus" @click="openAddDialog">新增用户</el-button>
+            <el-button v-permission="'user:import'" type="primary" :icon="Upload" @click="handleImport">批量导入</el-button>
+            <el-button v-permission="'user:add'" type="primary" :icon="Plus" @click="openAddDialog">新增用户</el-button>
           </div>
         </div>
       </template>
@@ -53,9 +53,9 @@
         </el-table-column>
         <el-table-column label="操作" min-width="240" fixed="right">
           <template #default="scope">
-            <el-button link type="primary" :icon="Edit" @click="openEditDialog(scope.row)">编辑</el-button>
-            <el-button link type="primary" :icon="Refresh" @click="handleResetPassword(scope.row)">重置密码</el-button>
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button v-permission="'user:update'" link type="primary" :icon="Edit" @click="openEditDialog(scope.row)">编辑</el-button>
+            <el-button v-permission="'user:reset-password'" link type="primary" :icon="Refresh" @click="handleResetPassword(scope.row)">重置密码</el-button>
+            <el-button v-permission="'user:delete'" link type="danger" :icon="Delete" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

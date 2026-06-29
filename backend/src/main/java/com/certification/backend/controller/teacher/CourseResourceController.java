@@ -45,7 +45,7 @@ public class CourseResourceController {
 
     @Operation(summary = "新增课程资源（手动填写资源信息）")
     @PostMapping
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAuthority('course:upload-resource')")
     public ResponseVO<CourseResourceResponse> add(@Valid @RequestBody CourseResourceRequest request) {
         String username = getCurrentUsername();
         return ResponseVO.success(courseResourceService.add(request, username));
@@ -54,7 +54,7 @@ public class CourseResourceController {
     @Operation(summary = "上传课程资源文件",
             description = "上传文件至服务器，仅允许 PDF/PPT/PPTX/DOC/DOCX/XLS/XLSX，最大 50MB")
     @PostMapping("/upload/{offeringId}")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAuthority('course:upload-resource')")
     public ResponseVO<CourseResourceResponse> upload(
             @PathVariable Long offeringId,
             @RequestParam("file") MultipartFile file,
@@ -65,7 +65,7 @@ public class CourseResourceController {
 
     @Operation(summary = "删除指定的课程资源")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('TEACHER')")
+    @PreAuthorize("hasAuthority('course:upload-resource')")
     public ResponseVO<Void> delete(@PathVariable Long id) {
         String username = getCurrentUsername();
         courseResourceService.delete(id, username);

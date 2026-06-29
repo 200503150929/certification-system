@@ -5,7 +5,7 @@
         <div class="card-header">
           <span>专业管理</span>
           <div>
-            <el-button type="primary" :icon="Plus" @click="handleAdd">新增专业</el-button>
+            <el-button v-permission="'program:add'" type="primary" :icon="Plus" @click="handleAdd">新增专业</el-button>
           </div>
         </div>
       </template>
@@ -47,6 +47,7 @@
             <!-- 草稿状态：显示编辑按钮 -->
             <el-button
                 v-if="scope.row.status === 'draft'"
+                v-permission="'program:update'"
                 link
                 type="primary"
                 @click="handleEditBasicInfo(scope.row)"
@@ -64,6 +65,7 @@
             <!-- 草稿状态：发布 -->
             <el-button
                 v-if="scope.row.status === 'draft'"
+                v-permission="'program:publish'"
                 link
                 type="success"
                 @click="handlePublish(scope.row.id)"
@@ -73,6 +75,7 @@
             <!-- 已发布状态：取消发布 -->
             <el-button
                 v-if="scope.row.status === 'published'"
+                v-permission="'program:publish'"
                 link
                 type="warning"
                 @click="handleUnpublish(scope.row.id)"
@@ -82,6 +85,7 @@
             <!-- 删除：只有草稿状态可删除，已发布不允许删除 -->
             <el-button
                 v-if="scope.row.status === 'draft'"
+                v-permission="'program:delete'"
                 link
                 type="danger"
                 @click="handleDelete(scope.row.id)"

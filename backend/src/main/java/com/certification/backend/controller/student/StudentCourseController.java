@@ -24,7 +24,7 @@ import java.util.List;
 @Tag(name = "11-学生课程查看", description = "学生查看自己所选课程列表与成绩")
 @RestController
 @RequestMapping("/student")
-@PreAuthorize("hasRole('STUDENT')")
+@PreAuthorize("hasAuthority('course:detail')")
 public class StudentCourseController {
 
     private final StudentCourseService studentCourseService;

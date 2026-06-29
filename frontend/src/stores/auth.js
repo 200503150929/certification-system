@@ -1,163 +1,79 @@
-// stores/auth.js - 完整版
-
+// stores/auth.js
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { login as loginApi } from '@/api/auth'
-import router from '@/router'
+import request from '@/api/request'
 
-export const useAuthStore = defineStore('auth', () => {
-  // ============ State ============
-  const token = ref(localStorage.getItem('token') || '')
-  const userId = ref(localStorage.getItem('userId') || '')
-  const username = ref(localStorage.getItem('username') || '')
-  const name = ref(localStorage.getItem('displayName') || '')
-  const role = ref(localStorage.getItem('userRole') || '')
-  const permissions = ref(loadPermissionsFromStorage())
-  const permissionsLoaded = ref(false)
+export const useAuthStore = defineStore('auth', {
+  state: () => ({
+    token: localStorage.getItem('token') || '',
+    userInfo: null,
+    permissions: [],
+    menuVersion: 0,
+  }),
 
-  function loadPermissionsFromStorage() {
-    try {
-      const stored = localStorage.getItem('permissions')
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed
-        }
-      }
-      return []
-    } catch {
-      return []
+  getters: {
+    isLoggedIn: (state) => !!state.token,
+    userName: (state) => state.userInfo?.name || '',
+    userRole: (state) => state.userInfo?.role || '',
+
+    hasPermission: (state) => (permission) => {
+      if (!permission) return true
+      // 管理员拥有所有权限（如果您的业务逻辑是这样）
+      if (state.userInfo?.role === 'admin') return true
+      return state.permissions.includes(permission)
     }
-  }
+  },
 
-  // ============ Getters ============
-  const isLoggedIn = computed(() => !!token.value)
+  actions: {
+    // 登录
+    async login(username, password) {
+      try {
+        const res = await request.post('/auth/login', { username, password })
+        if (res.status === 'success') {
+          this.token = res.data.token
+          localStorage.setItem('token', this.token)
+          this.userInfo = res.data.userInfo
+          // 登录后加载权限
+          await this.loadPermissions()
+          return { success: true }
+        }
+        return { success: false, message: res.info || '登录失败' }
+      } catch (error) {
+        return { success: false, message: error.message || '登录失败' }
+      }
+    },
 
-  const userRole = computed(() => role.value)
-
-  const userName = computed(() => name.value || username.value)
-
-  const displayName = computed(() => name.value || username.value)
-
-  const hasPermission = computed(() => (permissionCode) => {
-    if (!permissionCode) return true
-    if (!permissions.value || permissions.value.length === 0) return false
-    return permissions.value.includes(permissionCode)
-  })
-
-  // ============ Actions ============
-
-  async function login(credentials) {
-    const res = await loginApi(credentials.username, credentials.password)
-
-    if (res.status === 'success' && res.data) {
-      const { token: tk, userId: uid, username: uname, name: nm, role: rl, permissions: perms } = res.data
-
-      // ✅ 处理权限：如果后端没返回，根据角色设置默认权限
-      let finalPermissions = perms || []
-      if (finalPermissions.length === 0) {
-        console.log('后端未返回权限，根据角色设置默认权限')
-        const roleLower = (rl || '').toLowerCase()
-        if (roleLower === 'admin') {
-          finalPermissions = ['dashboard:view', 'user:list', 'role:list', 'course:manage', 'program:manage', 'program:detail']
-        } else if (roleLower === 'teacher') {
-          finalPermissions = ['dashboard:view', 'course:list', 'course:teach', 'course:student-list', 'program:view']
-        } else if (roleLower === 'student') {
-          finalPermissions = ['dashboard:view', 'course:list', 'course:detail', 'program:view']
+    // ========== 关键修改：使用 /permissions 接口 ==========
+    async loadPermissions() {
+      try {
+        // 后端接口：GET /permissions 返回 List<String>
+        const res = await request.get('/permissions')
+        if (res.status === 'success' && res.data) {
+          // res.data 是字符串数组，如 ['dashboard:view', 'user:list', ...]
+          this.permissions = res.data
+          // 增加版本号，触发菜单重新渲染
+          this.menuVersion++
+          console.log('权限已加载:', this.permissions)
         } else {
-          finalPermissions = ['dashboard:view']
+          this.permissions = []
         }
-        console.log('分配的默认权限:', finalPermissions)
+      } catch (error) {
+        console.error('加载权限失败:', error)
+        this.permissions = []
       }
+    },
 
-      // 更新 state
-      token.value = tk
-      userId.value = String(uid || '')
-      username.value = uname || ''
-      name.value = nm || ''
-      role.value = rl || ''
-      permissions.value = finalPermissions
-      permissionsLoaded.value = true
+    // 刷新权限（供外部调用）
+    async refreshPermissions() {
+      await this.loadPermissions()
+    },
 
-      // 持久化到 localStorage
-      localStorage.setItem('token', tk)
-      localStorage.setItem('userId', String(uid || ''))
-      localStorage.setItem('username', uname || '')
-      localStorage.setItem('displayName', nm || '')
-      localStorage.setItem('userRole', rl || '')
-      localStorage.setItem('permissions', JSON.stringify(finalPermissions))
-
-      return res.data
+    // 退出登录
+    logout() {
+      this.token = ''
+      this.userInfo = null
+      this.permissions = []
+      this.menuVersion = 0
+      localStorage.removeItem('token')
     }
-
-    throw new Error(res.info || '登录失败')
-  }
-
-  async function loadPermissions() {
-    if (permissionsLoaded.value && permissions.value.length > 0) {
-      return Promise.resolve()
-    }
-
-    const stored = loadPermissionsFromStorage()
-    if (stored && stored.length > 0) {
-      permissions.value = stored
-      permissionsLoaded.value = true
-      return Promise.resolve()
-    }
-
-    permissions.value = []
-    permissionsLoaded.value = true
-    return Promise.resolve()
-  }
-
-  function logout() {
-    token.value = ''
-    userId.value = ''
-    username.value = ''
-    name.value = ''
-    role.value = ''
-    permissions.value = []
-    permissionsLoaded.value = false
-
-    localStorage.removeItem('token')
-    localStorage.removeItem('userId')
-    localStorage.removeItem('username')
-    localStorage.removeItem('displayName')
-    localStorage.removeItem('userRole')
-    localStorage.removeItem('permissions')
-
-    router.push('/login')
-  }
-
-  function getHomePath() {
-    if (!token.value) return '/login'
-
-    const roleLower = (role.value || '').toLowerCase()
-    if (roleLower === 'admin') {
-      return '/dashboard'
-    }
-    if (roleLower === 'teacher' || roleLower === 'student') {
-      return '/app/my-courses'
-    }
-    return '/dashboard'
-  }
-
-  return {
-    token,
-    userId,
-    username,
-    name,
-    role,
-    permissions,
-    permissionsLoaded,
-    isLoggedIn,
-    userRole,
-    userName,
-    displayName,
-    hasPermission,
-    login,
-    loadPermissions,
-    logout,
-    getHomePath
   }
 })

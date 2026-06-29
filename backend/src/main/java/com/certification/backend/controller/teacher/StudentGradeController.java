@@ -25,7 +25,7 @@ import java.util.List;
 @Tag(name = "12-学生成绩管理", description = "教师端学生成绩录入、查询、批量导入导出")
 @RestController
 @RequestMapping("/teacher/student-grades")
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAuthority('course:enter-grade')")
 public class StudentGradeController {
 
     private final StudentGradeService studentGradeService;

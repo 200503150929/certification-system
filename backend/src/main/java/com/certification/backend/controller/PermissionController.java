@@ -49,7 +49,7 @@ public class PermissionController {
      */
     @Operation(summary = "获取所有权限列表（带分配标记）")
     @GetMapping("/all")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('role:list')")
     public ResponseVO<List<PermissionResponse>> getAllPermissions(@RequestParam(required = false) Long roleId) {
         if (roleId != null) {
             return ResponseVO.success(permissionService.getPermissionsWithAssigned(roleId));
@@ -63,7 +63,7 @@ public class PermissionController {
      */
     @Operation(summary = "更新角色权限")
     @PutMapping("/role/{roleId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('role:update')")
     public ResponseVO<Void> updateRolePermissions(@PathVariable Long roleId,
                                                   @RequestBody Map<String, List<Long>> body) {
         List<Long> permissionIds = body.get("permissionIds");

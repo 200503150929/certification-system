@@ -3,6 +3,7 @@
     <div class="tab-header">
       <span class="tab-title">培养目标列表</span>
       <el-button
+          v-permission="'program:manage'"
           type="primary"
           size="small"
           :icon="Plus"
@@ -20,6 +21,7 @@
           <span class="goal-sort">排序: {{ item.sortOrder || 0 }}</span>
           <div class="goal-actions">
             <el-button
+                v-permission="'program:manage'"
                 link
                 type="primary"
                 :icon="Edit"
@@ -27,6 +29,7 @@
                 :disabled="disabled"
             />
             <el-button
+                v-permission="'program:manage'"
                 link
                 type="danger"
                 :icon="Delete"
