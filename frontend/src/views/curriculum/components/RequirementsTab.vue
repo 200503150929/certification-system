@@ -106,7 +106,7 @@
     >
       <el-form ref="formRef" :model="formData" :rules="formRules" label-width="120px">
         <el-form-item label="要求编码" prop="code">
-          <el-input v-model="formData.code" placeholder="如：GR-1" />
+          <el-input v-model="formData.code" placeholder="如：1" />
         </el-form-item>
         <el-form-item label="要求描述" prop="description">
           <el-input
@@ -132,7 +132,7 @@
     >
       <el-form ref="indicatorFormRef" :model="indicatorFormData" :rules="indicatorFormRules" label-width="120px">
         <el-form-item label="指标点编码" prop="code">
-          <el-input v-model="indicatorFormData.code" placeholder="如：GR-1-1" />
+          <el-input v-model="indicatorFormData.code" placeholder="如：1.1" />
         </el-form-item>
         <el-form-item label="指标点描述" prop="description">
           <el-input
@@ -257,19 +257,25 @@ const manageIndicators = (item) => {
   expandedRequirementId.value = expandedRequirementId.value === item.id ? null : item.id
 }
 
+
 // 新增指标点
 const addIndicator = (requirementId) => {
   if (props.disabled) return
   currentRequirementId.value = requirementId
   indicatorDialogTitle.value = '新增指标点'
   isIndicatorEdit.value = false
-  indicatorFormData.code = `GR-${(indicatorMap.value[requirementId]?.length || 0) + 1}`
+
+  // 获取当前毕业要求的编码作为前缀
+  const req = requirementList.value.find(r => r.id === requirementId)
+  const prefix = req ? req.code : ''
+  const count = (indicatorMap.value[requirementId]?.length || 0) + 1
+  indicatorFormData.code = `${prefix}.${count}`  // 生成 "1.1", "1.2", "2.1" 等
+
   indicatorFormData.description = ''
   indicatorFormData.weight = 10
   indicatorFormData.passScore = 60
   indicatorDialogVisible.value = true
 }
-
 // 编辑指标点
 const editIndicator = (row) => {
   if (props.disabled) return
@@ -349,7 +355,7 @@ const handleAdd = () => {
   if (props.disabled) return
   dialogTitle.value = '新增毕业要求'
   isEdit.value = false
-  formData.code = `GR-${requirementList.value.length + 1}`
+  formData.code = `${requirementList.value.length + 1}`
   dialogVisible.value = true
 }
 
