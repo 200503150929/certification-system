@@ -27,7 +27,7 @@ import java.util.List;
 @Tag(name = "02-用户管理", description = "系统用户增删改查、密码重置、Excel 批量导入")
 @RestController
 @RequestMapping("/admin/users")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('user:list')")
 public class UserController {
 
     private final UserService userService;

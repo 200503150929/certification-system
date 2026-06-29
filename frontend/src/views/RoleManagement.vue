@@ -72,7 +72,7 @@ const getRoleLabel = (role) => {
 }
 
 const goToUserManagement = (roleName) => {
-  router.push({ path: '/users', query: { role: roleName } })
+  router.push({ path: '/app/users', query: { role: roleName } })
 }
 
 // 加载各角色用户数量

@@ -53,14 +53,21 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
+import { useAuthStore } from '@/stores/auth';
 import request from '@/api/request';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const loading = ref(false);
 const selectedSemester = ref('all');
 
-const userRole = ref(localStorage.getItem('userRole') || 'student');
-const pageTitle = computed(() => userRole.value === 'teacher' ? '课程管理' : '我的课程');
+const pageTitle = computed(() => {
+  if (authStore.permissions.includes('course:teach')) return '课程管理';
+  return '我的课程';
+});
+
+/** 判断当前用户是否为教师身份（拥有授课权限） */
+const isTeacher = computed(() => authStore.permissions.includes('course:teach'));
 
 // 从后端获取的课程数据
 const courses = ref([]);
@@ -104,7 +111,7 @@ const groupedCourses = computed(() => {
 const loadCourses = async () => {
   loading.value = true;
   try {
-    if (userRole.value === 'teacher') {
+    if (isTeacher.value) {
       // 教师端：调用教师开课列表API
       const res = await request.get('/teacher/offering/list', {
         params: { pageNum: 1, pageSize: 100 }
@@ -143,11 +150,11 @@ onMounted(() => {
 });
 
 const goToDetail = (course) => {
-  if (userRole.value === 'teacher') {
-    router.push(`/teacher/course/${course.offeringId}`);
+  if (isTeacher.value) {
+    router.push(`/app/teacher/course/${course.offeringId}`);
     return;
   }
-  router.push(`/course/${course.courseId}`);
+  router.push(`/app/course/${course.courseId}`);
 };
 </script>
 

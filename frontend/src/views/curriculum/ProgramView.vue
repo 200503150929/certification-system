@@ -139,7 +139,7 @@ const loadProgramInfo = async () => {
 
 // ============ 返回列表页 ============
 const goBack = () => {
-  router.push('/curriculum/view')
+  router.push('/app/curriculum/view')
 }
 
 // ============ 监听路由参数变化 ============

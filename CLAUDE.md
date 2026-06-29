@@ -42,6 +42,29 @@
 - 使用 Spring Security 的 `@PreAuthorize` 注解进行方法级权限控制（如 `@PreAuthorize("hasRole('ADMIN')")`）。
 - 当前登录用户通过 `SecurityContextHolder.getContext().getAuthentication()` 获取，**禁止**在 Controller / Service 中手动解析 Token。
 
+# 权限模型与编码约定
+
+## 当前权限实现方式（重构前）
+- 前端权限判断：通过 `User.role` 字段进行硬编码条件渲染（如 `v-if="user.role === 'admin'"`）。
+- 后端权限控制：使用 `@PreAuthorize("hasRole('ADMIN')")` 注解，角色与权限点强绑定。
+- 权限数据来源：仅依赖 JWT Token 中的角色信息，无独立权限表或动态权限列表。
+
+## 目标权限模型（重构后-RBAC）
+- 权限数据来源：后端提供独立权限接口（如 `/api/permissions`），返回当前用户的**权限标识符列表**（如 `["user:delete", "course:add"]`）。
+- 前端权限控制：
+  - 按钮级：使用自定义指令 `v-permission="'user:delete'"` 控制 DOM 显隐。
+  - 路由级：使用路由守卫 + 权限列表动态过滤菜单和可访问页面。
+- 后端权限控制：仍使用 `@PreAuthorize`，但权限表达式从 `hasRole('ADMIN')` 改为 `hasAuthority('user:delete')`，权限数据从数据库动态加载。
+- 角色仅作为权限集合的载体，不再在代码中硬编码判断 `role === 'admin'`。
+
+## 权限标识符命名规范
+- 格式：`<资源>:<操作>`，全部小写。
+- 示例：
+  - 用户管理：`user:add`、`user:delete`、`user:update`、`user:list`
+  - 课程管理：`course:add`、`course:delete`、`course:update`、`course:list`
+  - 培养方案：`program:add`、`program:delete`、`program:update`、`program:list`
+- 特殊权限：`*:*` 表示超级管理员（仅限系统管理员角色拥有）。
+
 # 核心业务域（对应七大模块）
 
 - **模块一（系统基础与权限管理）**：登录、用户管理（增删改查、批量导入、密码重置）、角色权限。

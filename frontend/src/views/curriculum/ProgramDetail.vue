@@ -194,11 +194,11 @@ const goBack = () => {
           type: 'warning'
         }
     ).then(() => {
-      router.push('/curriculum/management')
+      router.push('/app/curriculum/management')
     }).catch(() => {})
     return
   }
-  router.push('/curriculum/management')
+  router.push('/app/curriculum/management')
 }
 
 // ============ 数据变更标记 ============

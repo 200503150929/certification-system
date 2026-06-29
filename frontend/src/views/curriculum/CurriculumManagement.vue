@@ -237,7 +237,7 @@ const handleSearch = () => {
 // ============ 跳转到详情页 ============
 const goToDetail = (row) => {
   router.push({
-    path: `/curriculum/detail/${row.id}`
+    path: `/app/curriculum/detail/${row.id}`
   })
 }
 

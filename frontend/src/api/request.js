@@ -38,6 +38,7 @@ request.interceptors.response.use(
         ElMessage.error('登录已过期，请重新登录')
         localStorage.removeItem('token')
         localStorage.removeItem('userRole')
+        localStorage.removeItem('permissions')
         localStorage.removeItem('username')
         localStorage.removeItem('displayName')
         window.location.href = '/login'

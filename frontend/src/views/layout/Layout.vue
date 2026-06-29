@@ -18,47 +18,54 @@
           :collapse-transition="false"
       >
         <!-- 仪表盘 -->
-        <el-menu-item v-if="userRole !== 'student'" index="/dashboard">
+        <el-menu-item v-permission="'dashboard:view'" index="/dashboard">
           <el-icon><Monitor /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
 
-        <!-- 个人信息（学生/教师共用） -->
-        <el-menu-item v-if="userRole !== 'admin'" index="/profile">
+        <!-- 个人信息 -->
+        <el-menu-item v-permission="'profile:view'" index="/app/profile">
           <el-icon><User /></el-icon>
           <span>个人信息</span>
         </el-menu-item>
 
-        <!-- 我的课程（学生端）/ 课程管理（教师端） -->
-        <el-menu-item v-if="userRole !== 'admin'" index="/my-courses">
+        <!-- 我的课程 / 课程管理（管理员不显示） -->
+        <el-menu-item
+            v-if="userRole !== 'admin' && userRole !== 'ADMIN'"
+            v-permission="'course:list'"
+            index="/app/my-courses"
+        >
           <el-icon><Document /></el-icon>
           <span>{{ userRole === 'student' ? '我的课程' : '课程管理' }}</span>
         </el-menu-item>
 
-        <!-- 人才培养方案管理（管理员） -->
-        <el-menu-item v-if="userRole === 'admin'" index="/curriculum/management">
+        <!-- 人才培养方案管理（仅管理员） -->
+        <el-menu-item v-permission="'program:manage'" index="/app/curriculum/management">
           <el-icon><DocumentCopy /></el-icon>
           <span>人才培养方案管理</span>
         </el-menu-item>
 
-        <!-- 人才培养方案查看（教师/学生只读） -->
-        <el-menu-item v-if="userRole === 'teacher' || userRole === 'student'" index="/curriculum/view">
+        <!-- 人才培养方案查看（教师/学生只读）- 管理员不显示 -->
+        <el-menu-item
+            v-if="userRole !== 'admin' && userRole !== 'ADMIN'"
+            v-permission="'program:view'"
+            index="/app/curriculum/view"
+        >
           <el-icon><DocumentCopy /></el-icon>
           <span>人才培养方案</span>
         </el-menu-item>
 
-        <!-- 用户管理（管理员） -->
-        <el-menu-item v-if="userRole === 'admin'" index="/users">
+        <!-- 用户管理（仅管理员） -->
+        <el-menu-item v-permission="'user:list'" index="/app/users">
           <el-icon><User /></el-icon>
           <span>用户管理</span>
         </el-menu-item>
 
-        <!-- 角色权限管理（管理员） -->
-        <el-menu-item v-if="userRole === 'admin'" index="/roles">
+        <!-- 角色权限管理（仅管理员） -->
+        <el-menu-item v-permission="'role:list'" index="/app/roles">
           <el-icon><Connection /></el-icon>
           <span>角色权限管理</span>
         </el-menu-item>
-
       </el-menu>
 
       <!-- 侧边栏底部：用户信息 + 折叠按钮 -->
@@ -66,8 +73,8 @@
         <div class="user-info-wrapper">
           <el-avatar :size="isCollapse ? 32 : 40" :icon="UserFilled" />
           <div v-if="!isCollapse" class="user-info">
-            <p class="username">{{ userInfo.name || '管理员' }}</p>
-            <p class="user-role">{{ userInfo.role || 'admin' }}</p>
+            <p class="username">{{ userName }}</p>
+            <p class="user-role">{{ userRole }}</p>
           </div>
         </div>
         <el-button
@@ -177,69 +184,97 @@ const userInfo = ref({
   role: ''
 })
 
-const userRole = computed(() => userInfo.value.role)
+const userRole = computed(() => authStore.userRole || userInfo.value.role)
+const userName = computed(() => authStore.userName || userInfo.value.name)
 
 // ============ 面包屑配置 ============
 const breadcrumbConfig = {
-  // 人才培养方案模块
-  '/curriculum/management': {
-    items: [
-      { name: '人才培养方案管理' }
-    ]
-  },
-  '/curriculum/detail': {
-    items: [
-      { name: '人才培养方案管理', path: '/curriculum/management' },
-      { name: '专业详情' }
-    ]
-  },
-  // 人才培养方案查看（教师/学生）
-  '/curriculum/view': {
-    items: [
-      { name: '人才培养方案' }
-    ]
-  },
-
-  // 系统管理模块
-  '/users': {
-    items: [
-      { name: '系统管理' },
-      { name: '用户管理' }
-    ]
-  },
-  '/roles': {
-    items: [
-      { name: '系统管理' },
-      { name: '角色权限管理' }
-    ]
+  // 仪表盘
+  '/dashboard': {
+    items: [{ name: '仪表盘' }]
   },
 
   // 个人信息
-  '/profile': {
-    items: [
-      { name: '个人中心' },
-      { name: '个人信息' }
-    ]
-  },
-
-  // 仪表盘
-  '/dashboard': {
-    items: [
-      { name: '仪表盘' }
-    ]
+  '/app/profile': {
+    items: [{ name: '个人信息' }]
   },
 
   // 我的课程
-  '/my-courses': {
+  '/app/my-courses': {
+    items: [{ name: '我的课程' }]
+  },
+
+  // 课程管理（动态路由）
+  '/app/courses/program': {
     items: [
-      { name: '我的课程' }
+      { name: '课程管理' }
     ]
   },
 
-  // 修改密码
-  '/changePassword': {
+  // 课程详情（学生端）
+  '/app/course': {
     items: [
-      { name: '个人中心' },
+      { name: '我的课程', path: '/app/my-courses' },
+      { name: '课程详情' }
+    ]
+  },
+
+  // 课程管理详情（教师端）
+  '/app/teacher/course': {
+    items: [
+      { name: '课程管理', path: '/app/my-courses' },
+      { name: '课程管理' }
+    ]
+  },
+
+  // 学生名单
+  '/app/course/:id/students': {
+    items: [
+      { name: '课程管理', path: '/app/my-courses' },
+      { name: '学生名单' }
+    ]
+  },
+
+  // 人才培养方案管理（管理员）
+  '/app/curriculum/management': {
+    items: [{ name: '人才培养方案管理' }]
+  },
+
+  // 专业详情（管理员）
+  '/app/curriculum/detail': {
+    items: [
+      { name: '人才培养方案管理', path: '/app/curriculum/management' },
+      { name: '专业详情' }
+    ]
+  },
+
+  // 人才培养方案查看（教师/学生）
+  '/app/curriculum/view': {
+    items: [{ name: '人才培养方案' }]
+  },
+
+  // 专业详情查看（教师/学生）
+  '/app/curriculum/view/:id': {
+    items: [
+      { name: '人才培养方案', path: '/app/curriculum/view' },
+      { name: '专业详情' }
+    ]
+  },
+
+  // 用户管理
+  '/app/users': {
+    items: [{ name: '用户管理' }]
+  },
+
+  // 角色权限管理
+  '/app/roles': {
+    items: [{ name: '角色权限管理' }]
+  },
+
+  // 修改密码
+  '/app/changePassword': {
+    items: [
+      { name: '个人信息', path: '/app/profile' },
       { name: '修改密码' }
     ]
   }
@@ -252,21 +287,58 @@ const getBreadcrumbConfig = (path) => {
     return breadcrumbConfig[path]
   }
 
-  // 动态路由匹配（如 /curriculum/detail/1）
-  if (path.startsWith('/curriculum/detail/')) {
+  // 动态路由匹配 - 课程管理
+  if (path.startsWith('/app/courses/program/')) {
+    return {
+      items: [{ name: '课程管理' }]
+    }
+  }
+
+  // 动态路由匹配 - 课程详情（学生端）
+  if (path.startsWith('/app/course/') && !path.includes('/students')) {
     return {
       items: [
-        { name: '人才培养方案管理', path: '/curriculum/management' },
+        { name: '我的课程', path: '/app/my-courses' },
+        { name: '课程详情' }
+      ]
+    }
+  }
+
+  // 动态路由匹配 - 课程管理详情（教师端）
+  if (path.startsWith('/app/teacher/course/')) {
+    return {
+      items: [
+        { name: '课程管理', path: '/app/my-courses' },
+        { name: '课程管理' }
+      ]
+    }
+  }
+
+  // 动态路由匹配 - 学生名单
+  if (path.includes('/students')) {
+    return {
+      items: [
+        { name: '课程管理', path: '/app/my-courses' },
+        { name: '学生名单' }
+      ]
+    }
+  }
+
+  // 动态路由匹配 - 专业详情（管理员）
+  if (path.startsWith('/app/curriculum/detail/')) {
+    return {
+      items: [
+        { name: '人才培养方案管理', path: '/app/curriculum/management' },
         { name: '专业详情' }
       ]
     }
   }
 
-  // 动态路由匹配（如 /curriculum/view/1）- 教师/学生端
-  if (path.startsWith('/curriculum/view/')) {
+  // 动态路由匹配 - 专业详情查看（教师/学生）
+  if (path.startsWith('/app/curriculum/view/')) {
     return {
       items: [
-        { name: '人才培养方案', path: '/curriculum/view' },
+        { name: '人才培养方案', path: '/app/curriculum/view' },
         { name: '专业详情' }
       ]
     }
@@ -287,14 +359,36 @@ const breadcrumbItems = computed(() => {
 
 // 当前激活菜单
 const activeMenu = computed(() => {
-  // 专业详情页高亮"人才培养方案管理"
-  if (route.path.startsWith('/curriculum/detail/')) return '/curriculum/management'
-  // 人才培养方案查看页高亮
-  if (route.path.startsWith('/curriculum/view/')) return '/curriculum/view'
-  // 人才培养方案所有子页面都高亮"人才培养方案管理"
-  if (route.path.startsWith('/curriculum/')) return '/curriculum/management'
-  // 修改密码高亮"个人信息"
-  if (route.path === '/changePassword') return '/profile'
+  // 仪表盘
+  if (route.path === '/dashboard') return '/dashboard'
+
+  // 个人信息
+  if (route.path === '/app/profile') return '/app/profile'
+
+  // 我的课程
+  if (route.path === '/app/my-courses') return '/app/my-courses'
+
+  // 课程管理相关页面 - 高亮"我的课程"
+  if (route.path.startsWith('/app/courses/')) return '/app/my-courses'
+  if (route.path.startsWith('/app/course/')) return '/app/my-courses'
+  if (route.path.startsWith('/app/teacher/')) return '/app/my-courses'
+
+  // 人才培养方案管理相关页面 - 高亮"人才培养方案管理"
+  if (route.path.startsWith('/app/curriculum/detail/')) return '/app/curriculum/management'
+  if (route.path.startsWith('/app/curriculum/management')) return '/app/curriculum/management'
+
+  // 人才培养方案查看相关页面 - 高亮"人才培养方案"
+  if (route.path.startsWith('/app/curriculum/view/')) return '/app/curriculum/view'
+
+  // 用户管理
+  if (route.path === '/app/users') return '/app/users'
+
+  // 角色权限管理
+  if (route.path === '/app/roles') return '/app/roles'
+
+  // 修改密码 - 高亮"个人信息"
+  if (route.path === '/app/changePassword') return '/app/profile'
+
   return route.path
 })
 
@@ -307,7 +401,7 @@ const toggleCollapse = () => {
 const handleCommand = (command) => {
   switch (command) {
     case 'changePassword':
-      router.push('/changePassword')
+      router.push('/app/changePassword')
       break
     case 'logout':
       handleLogout()
@@ -335,11 +429,8 @@ const handleLogout = () => {
 
 // ============ 加载用户信息 ============
 const loadUserInfo = () => {
-  const role = localStorage.getItem('userRole') || ''
-  const name = localStorage.getItem('displayName') || ''
-
-  userInfo.value.role = role
-  userInfo.value.name = name
+  userInfo.value.name = authStore.userName
+  userInfo.value.role = authStore.userRole
 }
 
 // ============ 生命周期 ============

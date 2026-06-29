@@ -5,6 +5,8 @@ import 'element-plus/dist/index.css'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
+import permissionDirective from './directives/permission'
+
 import App from './App.vue'
 import router from './router'
 
@@ -19,5 +21,8 @@ app.use(router)
 app.use(ElementPlus, {
   locale: zhCn,  // 设置为中文
 })
+
+// 注册全局权限指令
+app.directive('permission', permissionDirective)
 
 app.mount('#app')

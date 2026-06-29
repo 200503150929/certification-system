@@ -8,17 +8,22 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * JWT Token 校验过滤器，拦截请求并设置 SecurityContextHolder
+ * JWT Token 校验过滤器
+ *
+ * 从请求头提取 JWT Token，解析出用户名、角色、权限标识符，
+ * 构建 authorities 并设置到 SecurityContextHolder。
  */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -29,14 +34,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtil jwtUtil;
-    private final UserDetailsServiceImpl userDetailsService;
     private final UserRepository userRepository;
 
     public JwtAuthenticationFilter(JwtUtil jwtUtil,
-                                   UserDetailsServiceImpl userDetailsService,
                                    UserRepository userRepository) {
         this.jwtUtil = jwtUtil;
-        this.userDetailsService = userDetailsService;
         this.userRepository = userRepository;
     }
 
@@ -57,15 +59,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         .orElse(false);
 
                 if (userActive && jwtUtil.validateToken(token)) {
-                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    String role = jwtUtil.getRole(token);
+                    List<String> permissions = jwtUtil.getPermissions(token);
+
+                    // 构建 authorities：ROLE_ + 权限标识符
+                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                    if (role != null) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+                    }
+                    permissions.forEach(p -> authorities.add(new SimpleGrantedAuthority(p)));
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails, null, userDetails.getAuthorities());
+                                    username, null, authorities);
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                    log.debug("JWT 认证成功: {}", username);
+                    log.debug("JWT 认证成功: {} (role={}, permissions={})", username, role, permissions.size());
                 } else {
                     log.warn("JWT 用户无效或 Token 已过期: {}", username);
                 }
