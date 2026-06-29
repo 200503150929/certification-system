@@ -66,6 +66,11 @@
               width="120"
               align="center"
           >
+            <template #header>
+              <el-tooltip :content="req.description" placement="top" effect="dark">
+                <span>{{ req.code }}</span>
+              </el-tooltip>
+            </template>
             <template #default="scope">
               <el-select
                   v-model="scope.row.supportMap[req.id]"
@@ -108,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, reactive, onMounted, watch, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Warning } from '@element-plus/icons-vue'
 import request from '@/api/request'
@@ -172,8 +177,9 @@ const checkUnsavedChanges = () => {
     return
   }
   const currentSnapshot = createSnapshot(matrixData.value)
-  hasUnsavedChanges.value = currentSnapshot !== originalDataSnapshot
-  emit('unsaved-change', hasUnsavedChanges.value)
+  const changed = currentSnapshot !== originalDataSnapshot
+  hasUnsavedChanges.value = changed
+  emit('unsaved-change', changed)
 }
 
 // 支撑关系变化时标记为未保存
@@ -245,7 +251,7 @@ const loadData = async () => {
         for (const req of requirements.value) {
           row.supportMap[req.id] = ''
         }
-        // 填充已有的支撑关系（数据库直接存的是 H/M/L，无需转换）
+        // 填充已有的支撑关系
         const existingItems = matrixMap[obj.id] || []
         for (const item of existingItems) {
           const supportLevel = item.supportLevel || ''
@@ -290,19 +296,39 @@ const handleSaveAll = async () => {
     return
   }
 
+  // 检查是否有支撑关系需要保存
+  let hasValidSupport = false
+  for (const row of matrixData.value) {
+    for (const req of requirements.value) {
+      const supportLevel = row.supportMap[req.id]
+      if (supportLevel && ['H', 'M', 'L'].includes(supportLevel)) {
+        hasValidSupport = true
+        break
+      }
+    }
+    if (hasValidSupport) break
+  }
+
+  if (!hasValidSupport) {
+    ElMessage.warning('至少需要配置一个支撑关系才能保存')
+    return
+  }
+
   saving.value = true
   try {
     for (const row of matrixData.value) {
       const items = []
       for (const req of requirements.value) {
         const supportLevel = row.supportMap[req.id]
-        if (supportLevel) {
+        if (supportLevel && ['H', 'M', 'L'].includes(supportLevel)) {
           items.push({
             requirementId: req.id,
-            supportLevel: supportLevel // 直接存 H/M/L，无需转换
+            supportLevel: supportLevel
           })
         }
       }
+
+      // 即使 items 为空也调用接口，用于清空该目标的矩阵
       await request.post('/admin/program/matrix/batch-save', {
         objectiveId: row.id,
         items: items
@@ -344,13 +370,46 @@ const checkBeforeLeave = () => {
   return Promise.resolve()
 }
 
+// 获取矩阵数据（供父组件校验使用）
+const getMatrixData = () => {
+  return matrixData.value
+}
+
+// 获取毕业要求列表（供父组件校验使用）
+const getRequirements = () => {
+  return requirements.value
+}
+
+// 获取培养目标列表（供父组件校验使用）
+const getObjectives = () => {
+  return objectives.value
+}
+
+// 检查是否所有目标都有支撑关系
+const checkAllObjectivesHaveSupport = () => {
+  if (matrixData.value.length === 0) return false
+
+  for (const row of matrixData.value) {
+    let hasSupport = false
+    for (const req of requirements.value) {
+      const supportLevel = row.supportMap[req.id]
+      if (supportLevel && ['H', 'M', 'L'].includes(supportLevel)) {
+        hasSupport = true
+        break
+      }
+    }
+    if (!hasSupport) return false
+  }
+  return true
+}
+
 // 监听 programId 变化重新加载
 watch(() => props.programId, () => {
   // 重置未保存状态
   hasUnsavedChanges.value = false
   emit('unsaved-change', false)
   loadData()
-}, { immediate: true })
+}, {immediate: true})
 
 // 监听 disabled 变化，当变为 true（已发布）时重置未保存状态
 watch(() => props.disabled, (newVal) => {
@@ -375,7 +434,11 @@ onBeforeUnmount(() => {
 defineExpose({
   saveAll,
   checkBeforeLeave,
-  hasUnsavedChanges
+  hasUnsavedChanges,
+  getMatrixData,
+  getRequirements,
+  getObjectives,
+  checkAllObjectivesHaveSupport
 })
 </script>
 
@@ -447,13 +510,16 @@ defineExpose({
   background-color: #fef0f0 !important;
   border-color: #f56c6c !important;
 }
+
 :deep(.select-strong .el-input__wrapper:hover) {
   border-color: #f56c6c !important;
 }
+
 :deep(.select-strong .el-input__wrapper.is-focus) {
   border-color: #f56c6c !important;
   box-shadow: 0 0 0 2px rgba(245, 108, 108, 0.2) !important;
 }
+
 :deep(.select-strong .el-select__selected-item) {
   color: #f56c6c !important;
   font-weight: 700;
@@ -463,13 +529,16 @@ defineExpose({
   background-color: #fdf6ec !important;
   border-color: #e6a23c !important;
 }
+
 :deep(.select-medium .el-input__wrapper:hover) {
   border-color: #e6a23c !important;
 }
+
 :deep(.select-medium .el-input__wrapper.is-focus) {
   border-color: #e6a23c !important;
   box-shadow: 0 0 0 2px rgba(230, 162, 60, 0.2) !important;
 }
+
 :deep(.select-medium .el-select__selected-item) {
   color: #e6a23c !important;
   font-weight: 700;
@@ -479,13 +548,16 @@ defineExpose({
   background-color: #f0f9eb !important;
   border-color: #67c23a !important;
 }
+
 :deep(.select-weak .el-input__wrapper:hover) {
   border-color: #67c23a !important;
 }
+
 :deep(.select-weak .el-input__wrapper.is-focus) {
   border-color: #67c23a !important;
   box-shadow: 0 0 0 2px rgba(103, 194, 58, 0.2) !important;
 }
+
 :deep(.select-weak .el-select__selected-item) {
   color: #67c23a !important;
   font-weight: 700;
@@ -495,18 +567,31 @@ defineExpose({
   background-color: #f5f7fa !important;
   border-color: #dcdfe6 !important;
 }
+
 :deep(.select-none .el-input__wrapper:hover) {
   border-color: #dcdfe6 !important;
 }
+
 :deep(.select-none .el-select__selected-item) {
   color: #c0c4cc !important;
 }
 
 /* 下拉框选项样式 */
-.support-option.support-strong { color: #f56c6c; }
-.support-option.support-medium { color: #e6a23c; }
-.support-option.support-weak { color: #67c23a; }
-.support-option.support-none { color: #c0c4cc; }
+.support-option.support-strong {
+  color: #f56c6c;
+}
+
+.support-option.support-medium {
+  color: #e6a23c;
+}
+
+.support-option.support-weak {
+  color: #67c23a;
+}
+
+.support-option.support-none {
+  color: #c0c4cc;
+}
 
 /* ========== 图例 ========== */
 .matrix-legend {
@@ -530,10 +615,21 @@ defineExpose({
   font-weight: 500;
 }
 
-.matrix-legend .legend-item.support-strong { color: #f56c6c; }
-.matrix-legend .legend-item.support-medium { color: #e6a23c; }
-.matrix-legend .legend-item.support-weak { color: #67c23a; }
-.matrix-legend .legend-item.support-none { color: #c0c4cc; }
+.matrix-legend .legend-item.support-strong {
+  color: #f56c6c;
+}
+
+.matrix-legend .legend-item.support-medium {
+  color: #e6a23c;
+}
+
+.matrix-legend .legend-item.support-weak {
+  color: #67c23a;
+}
+
+.matrix-legend .legend-item.support-none {
+  color: #c0c4cc;
+}
 
 .matrix-legend .legend-tip {
   font-size: 12px;

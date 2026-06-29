@@ -29,10 +29,10 @@ public class ProgramController {
     private final ObjectiveRequirementMatrixService objectiveRequirementMatrixService;
 
     public ProgramController(ProgramService programService,
-                              EducationalObjectiveService educationalObjectiveService,
-                              GraduationRequirementService graduationRequirementService,
-                              IndicatorPointService indicatorPointService,
-                              ObjectiveRequirementMatrixService objectiveRequirementMatrixService) {
+                             EducationalObjectiveService educationalObjectiveService,
+                             GraduationRequirementService graduationRequirementService,
+                             IndicatorPointService indicatorPointService,
+                             ObjectiveRequirementMatrixService objectiveRequirementMatrixService) {
         this.programService = programService;
         this.educationalObjectiveService = educationalObjectiveService;
         this.graduationRequirementService = graduationRequirementService;
@@ -95,10 +95,18 @@ public class ProgramController {
         return ResponseVO.success();
     }
 
-    @Operation(summary = "发布专业", description = "将状态从 draft 改为 published")
+    @Operation(summary = "发布专业", description = "将状态从 draft 改为 published，发布前会校验数据完整性")
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/publish/{id}")
     public ResponseVO<Void> publish(@PathVariable Long id) {
+        // 1. 数据完整性校验
+        List<String> validationErrors = programService.validateProgramData(id);
+        if (!validationErrors.isEmpty()) {
+            String errorMessage = String.join("；", validationErrors);
+            return ResponseVO.error(ResultCodeEnum.BAD_REQUEST.getCode(), "数据不完整，无法发布：" + errorMessage);
+        }
+
+        // 2. 执行发布
         programService.publishProgram(id);
         return ResponseVO.success();
     }
