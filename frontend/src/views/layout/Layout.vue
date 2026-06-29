@@ -1,14 +1,15 @@
 <template>
   <el-container class="layout-container">
+    <!-- 添加 menuKey 强制重新渲染侧边栏 -->
     <el-aside :width="isCollapse ? '64px' : '220px'">
       <div class="sidebar-header">
         <el-icon><School /></el-icon>
         <span v-if="!isCollapse">工程系统</span>
       </div>
 
-      <!-- 关键：添加 :key="authStore.menuVersion" -->
+      <!-- 使用 menuKey 作为 key，每次权限变化时重新渲染整个菜单 -->
       <el-menu
-          :key="authStore.menuVersion"
+          :key="menuKey"
           active-text-color="#ffd04b"
           background-color="#001529"
           class="el-menu-vertical-demo"
@@ -18,44 +19,43 @@
           :collapse="isCollapse"
           :collapse-transition="false"
       >
+        <!-- 仪表盘 -->
         <el-menu-item v-permission="'dashboard:view'" index="/dashboard">
           <el-icon><Monitor /></el-icon>
           <span>仪表盘</span>
         </el-menu-item>
 
-        <el-menu-item v-permission="'profile:view'" index="/app/profile">
+        <!-- 个人信息（所有用户可见） -->
+        <el-menu-item index="/app/profile">
           <el-icon><User /></el-icon>
           <span>个人信息</span>
         </el-menu-item>
 
-        <el-menu-item
-            v-if="userRole !== 'admin' && userRole !== 'ADMIN'"
-            v-permission="'course:list'"
-            index="/app/my-courses"
-        >
+        <!-- 我的课程/课程管理（完全由权限控制） -->
+        <el-menu-item v-permission="'course:list'" index="/app/my-courses">
           <el-icon><Document /></el-icon>
           <span>{{ userRole === 'student' ? '我的课程' : '课程管理' }}</span>
         </el-menu-item>
 
+        <!-- 人才培养方案管理 -->
         <el-menu-item v-permission="'program:manage'" index="/app/curriculum/management">
           <el-icon><DocumentCopy /></el-icon>
           <span>人才培养方案管理</span>
         </el-menu-item>
 
-        <el-menu-item
-            v-if="userRole !== 'admin' && userRole !== 'ADMIN'"
-            v-permission="'program:view'"
-            index="/app/curriculum/view"
-        >
+        <!-- 人才培养方案查看 -->
+        <el-menu-item v-permission="'program:view'" index="/app/curriculum/view">
           <el-icon><DocumentCopy /></el-icon>
           <span>人才培养方案</span>
         </el-menu-item>
 
+        <!-- 用户管理 -->
         <el-menu-item v-permission="'user:list'" index="/app/users">
           <el-icon><User /></el-icon>
           <span>用户管理</span>
         </el-menu-item>
 
+        <!-- 角色权限管理 -->
         <el-menu-item v-permission="'role:list'" index="/app/roles">
           <el-icon><Connection /></el-icon>
           <span>角色权限管理</span>
@@ -102,7 +102,7 @@
 
           <el-dropdown @command="handleCommand">
             <span class="el-dropdown-link">
-              {{ userInfo.name || '用户' }}
+              {{ displayName }}
               <el-icon class="el-icon--right"><ArrowDown /></el-icon>
             </span>
             <template #dropdown>
@@ -133,7 +133,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import {
@@ -150,10 +150,50 @@ const authStore = useAuthStore()
 const isCollapse = ref(false)
 const notificationCount = ref(3)
 
-const userInfo = ref({ name: '', role: '' })
+// ========== 菜单强制刷新 key ==========
+const menuKey = ref(0)
 
-const userRole = computed(() => authStore.userInfo?.role || userInfo.value.role)
-const userName = computed(() => authStore.userInfo?.name || userInfo.value.name)
+// ========== 确保 userInfo 存在 ==========
+const ensureUserInfo = () => {
+  if (!authStore.userInfo) {
+    const savedUserInfo = localStorage.getItem('userInfo')
+    if (savedUserInfo) {
+      try {
+        authStore.userInfo = JSON.parse(savedUserInfo)
+        console.log('Layout: 从 localStorage 恢复 userInfo:', authStore.userInfo)
+      } catch (e) {
+        console.warn('Layout: 解析 userInfo 失败:', e)
+      }
+    }
+  }
+
+  // 如果 token 存在但 permissions 为空，加载权限
+  if (authStore.token && authStore.permissions.length === 0) {
+    authStore.loadPermissions().catch(err => {
+      console.warn('Layout: 加载权限失败:', err)
+    })
+  }
+}
+
+// ========== 监听 menuVersion 变化，强制刷新菜单 ==========
+watch(
+    () => authStore.menuVersion,
+    (newVal, oldVal) => {
+      console.log('Layout: menuVersion 变化:', oldVal, '->', newVal)
+      // 更新 menuKey 强制重新渲染菜单
+      menuKey.value = Date.now()
+    },
+    { immediate: true }
+)
+
+// ========== 计算属性 ==========
+const userRole = computed(() => authStore.userInfo?.role || '')
+const userName = computed(() => authStore.userInfo?.name || authStore.userInfo?.username || '')
+
+// 显示名称（优先使用 name，其次 username）
+const displayName = computed(() => {
+  return authStore.userInfo?.name || authStore.userInfo?.username || '用户'
+})
 
 const breadcrumbConfig = {
   '/dashboard': { items: [{ name: '仪表盘' }] },
@@ -214,6 +254,7 @@ const activeMenu = computed(() => {
   return route.path
 })
 
+// ========== 方法 ==========
 const toggleCollapse = () => {
   isCollapse.value = !isCollapse.value
 }
@@ -243,13 +284,12 @@ const handleLogout = () => {
   }).catch(() => {})
 }
 
-const loadUserInfo = () => {
-  userInfo.value.name = authStore.userInfo?.name || ''
-  userInfo.value.role = authStore.userInfo?.role || ''
-}
-
+// ========== 生命周期 ==========
 onMounted(() => {
-  loadUserInfo()
+  ensureUserInfo()
+  // 初始化 menuKey
+  menuKey.value = Date.now()
+  console.log('Layout: 初始化完成, menuKey:', menuKey.value)
 })
 </script>
 

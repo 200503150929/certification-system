@@ -46,53 +46,54 @@ public class PermissionDataInitializer implements CommandLineRunner {
         }
         log.info("初始化权限数据...");
 
-        // ============ 1. 定义所有权限 ============
+// ============ 1. 定义所有权限 ============
         List<Permission> allPermissions = Arrays.asList(
                 // ---- 仪表盘 ----
                 createPermission("dashboard:view", "查看仪表盘", "dashboard", 1),
 
+                // ---- 个人信息 ----
+                createPermission("profile:view", "查看个人信息", "profile", 10),
+                createPermission("profile:edit", "编辑个人信息", "profile", 11),
+                createPermission("profile:change-password", "修改密码", "profile", 12),
+
                 // ---- 用户管理 ----
-                createPermission("user:list", "用户列表", "user", 10),
-                createPermission("user:add", "添加用户", "user", 11),
-                createPermission("user:update", "编辑用户", "user", 12),
-                createPermission("user:delete", "删除用户", "user", 13),
-                createPermission("user:reset-password", "重置密码", "user", 14),
-                createPermission("user:import", "批量导入用户", "user", 15),
+                createPermission("user:list", "用户列表", "user", 20),
+                createPermission("user:add", "添加用户", "user", 21),
+                createPermission("user:update", "编辑用户", "user", 22),
+                createPermission("user:delete", "删除用户", "user", 23),
+                createPermission("user:reset-password", "重置密码", "user", 24),
+                createPermission("user:import", "批量导入用户", "user", 25),
 
                 // ---- 角色权限管理 ----
-                createPermission("role:list", "角色列表", "role", 20),
-                createPermission("role:update", "编辑角色权限", "role", 21),
+                createPermission("role:list", "角色列表", "role", 30),
+                createPermission("role:update", "编辑角色权限", "role", 31),
 
                 // ---- 培养方案管理 ----
-                createPermission("program:manage", "管理培养方案", "program", 30),
-                createPermission("program:detail", "查看专业详情", "program", 31),
-                createPermission("program:view", "查看培养方案(只读)", "program", 32),
-                createPermission("program:add", "添加专业", "program", 33),
-                createPermission("program:update", "编辑专业", "program", 34),
-                createPermission("program:delete", "删除专业", "program", 35),
-                createPermission("program:publish", "发布培养方案", "program", 36),
+                createPermission("program:view", "查看培养方案(只读)", "program", 40),
+                createPermission("program:detail", "查看专业详情", "program", 41),
+                createPermission("program:manage", "管理培养方案", "program", 42),
+                createPermission("program:add", "添加专业", "program", 43),
+                createPermission("program:update", "编辑专业", "program", 44),
+                createPermission("program:delete", "删除专业", "program", 45),
+                createPermission("program:publish", "发布培养方案", "program", 46),
 
                 // ---- 课程体系管理 ----
-                createPermission("course:manage", "管理课程体系", "course", 40),
-                createPermission("course:list", "查看课程列表", "course", 41),
-                createPermission("course:detail", "查看课程详情", "course", 42),
-                createPermission("course:add", "添加课程", "course", 43),
-                createPermission("course:update", "编辑课程", "course", 44),
-                createPermission("course:delete", "删除课程", "course", 45),
-                createPermission("course:support-matrix", "管理支撑矩阵", "course", 46),
+
+                createPermission("course:manage", "管理课程体系", "course", 50),
+                createPermission("course:add", "添加课程", "course", 51),
+                createPermission("course:update", "编辑课程", "course", 52),
+                createPermission("course:delete", "删除课程", "course", 53),
+                createPermission("course:support-matrix", "管理支撑矩阵", "course", 54),
 
                 // ---- 课程教学管理（教师） ----
-                createPermission("course:teach", "管理授课课程", "teaching", 50),
-                createPermission("course:student-list", "查看学生名单", "teaching", 51),
-                createPermission("course:set-goals", "设置课程目标", "teaching", 52),
-                createPermission("course:set-assessment", "设置考核方式", "teaching", 53),
-                createPermission("course:enter-grade", "录入成绩", "teaching", 54),
-                createPermission("course:upload-resource", "上传课程资源", "teaching", 55),
-
-                // ---- 个人信息 ----
-                createPermission("profile:view", "查看个人信息", "profile", 60),
-                createPermission("profile:edit", "编辑个人信息", "profile", 61),
-                createPermission("profile:change-password", "修改密码", "profile", 62),
+                createPermission("course:teach", "管理授课课程", "teaching", 60),
+                createPermission("course:list", "查看课程列表", "course", 61),
+                createPermission("course:detail", "查看课程详情", "course", 62),
+                createPermission("course:student-list", "查看学生名单", "teaching", 63),
+                createPermission("course:set-goals", "设置课程目标", "teaching", 64),
+                createPermission("course:set-assessment", "设置考核方式", "teaching", 65),
+                createPermission("course:enter-grade", "录入成绩", "teaching", 66),
+                createPermission("course:upload-resource", "上传课程资源", "teaching", 67),
 
                 // ---- 达成度分析 ----
                 createPermission("achievement:view", "查看达成度数据", "achievement", 70),
@@ -105,14 +106,13 @@ public class PermissionDataInitializer implements CommandLineRunner {
         // ============ 2. 角色-权限映射 ============
         Map<String, List<String>> rolePermissionMap = new HashMap<>();
 
-        // 超级管理员：所有权限
+        // 管理员
         rolePermissionMap.put("admin", Arrays.asList(
                 "dashboard:view",
                 "user:list", "user:add", "user:update", "user:delete", "user:reset-password", "user:import",
                 "role:list", "role:update",
-                "program:manage", "program:detail", "program:view", "program:add", "program:update", "program:delete", "program:publish",
-                "course:manage", "course:list", "course:detail", "course:add", "course:update", "course:delete", "course:support-matrix",
-                "course:teach", "course:student-list", "course:set-goals", "course:set-assessment", "course:enter-grade", "course:upload-resource",
+                "program:manage", "program:detail",  "program:add", "program:update", "program:delete", "program:publish",
+                "course:manage", "course:detail", "course:add", "course:update", "course:delete", "course:support-matrix",
                 "profile:view", "profile:edit", "profile:change-password",
                 "achievement:view", "achievement:export"
         ));

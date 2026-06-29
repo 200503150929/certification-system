@@ -136,7 +136,6 @@
           您的账号由管理员统一管理，<br />
           如需重置密码，请自行联系管理员处理。
         </p>
-
       </div>
 
       <template #footer>
@@ -396,28 +395,45 @@ const handleLogin = () => {
     loading.value = true
 
     try {
-      const data = await authStore.login({
-        username: loginForm.value.username,
-        password: loginForm.value.password
-      })
+      // ========== ✅ 修复1：传递两个独立参数 ==========
+      const result = await authStore.login(
+          loginForm.value.username,
+          loginForm.value.password
+      )
 
-      resetLoginAttempts()
+      // ========== ✅ 修复2：检查 result.success ==========
+      if (result.success) {
+        // 登录成功
+        resetLoginAttempts()
 
-      if (rememberMe.value) {
-        localStorage.setItem('rememberMe', 'true')
-        localStorage.setItem('savedUsername', loginForm.value.username)
+        if (rememberMe.value) {
+          localStorage.setItem('rememberMe', 'true')
+          localStorage.setItem('savedUsername', loginForm.value.username)
+        } else {
+          localStorage.removeItem('rememberMe')
+          localStorage.removeItem('savedUsername')
+        }
+
+        // ========== ✅ 修复3：从 authStore 获取用户信息 ==========
+        const userName = authStore.userInfo?.name ||
+            authStore.userInfo?.username ||
+            loginForm.value.username
+        ElMessage.success(`欢迎回来，${userName}`)
+
+        // 跳转到首页
+        const homePath = authStore.getHomePath()
+        router.push(homePath)
       } else {
-        localStorage.removeItem('rememberMe')
-        localStorage.removeItem('savedUsername')
+        // ========== ✅ 修复4：登录失败处理 ==========
+        recordFailedAttempt()
+        ElMessage.error(result.message || '登录失败，请重试')
       }
-
-      ElMessage.success(`欢迎回来，${data.name || data.username}`)
-      router.push(authStore.getHomePath())
     } catch (error) {
+      // ========== ✅ 修复5：捕获异常 ==========
       recordFailedAttempt()
-
-      const errorMsg = error.message || '登录失败，请重试'
+      const errorMsg = error?.message || '登录失败，请检查网络连接'
       ElMessage.error(errorMsg)
+      console.error('登录异常:', error)
     } finally {
       loading.value = false
     }

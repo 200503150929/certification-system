@@ -1,5 +1,6 @@
 package com.certification.backend.service.impl;
 
+import com.certification.backend.dto.request.UpdateProfileRequest;
 import com.certification.backend.dto.request.UserRequest;
 import com.certification.backend.dto.request.PageQuery;
 import com.certification.backend.dto.response.PageResult;
@@ -188,6 +189,29 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
         return toProfileResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
+        log.info("更新用户个人信息: username={}, phone={}, email={}",
+                username, request.getPhone(), request.getEmail());
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
+
+        // 更新字段
+        if (request.getPhone() != null && !request.getPhone().isEmpty()) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
+            user.setEmail(request.getEmail());
+        }
+
+        User updatedUser = userRepository.save(user);
+        log.info("用户个人信息更新成功: id={}, username={}", updatedUser.getId(), updatedUser.getUsername());
+
+        return toProfileResponse(updatedUser);
     }
 
     /**

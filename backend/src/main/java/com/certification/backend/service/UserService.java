@@ -2,6 +2,7 @@ package com.certification.backend.service;
 
 import com.certification.backend.dto.request.UserRequest;
 import com.certification.backend.dto.request.PageQuery;
+import com.certification.backend.dto.request.UpdateProfileRequest;
 import com.certification.backend.dto.response.PageResult;
 import com.certification.backend.dto.response.UserProfileResponse;
 import com.certification.backend.dto.response.UserResponse;
@@ -58,4 +59,12 @@ public interface UserService {
      */
     UserProfileResponse getProfile(String username);
 
+    /**
+     * 更新用户个人信息（手机号、邮箱）
+     *
+     * @param username 用户名
+     * @param request  更新请求
+     * @return 更新后的个人信息
+     */
+    UserProfileResponse updateProfile(String username, UpdateProfileRequest request);
 }

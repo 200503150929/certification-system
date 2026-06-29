@@ -1,3 +1,4 @@
+// router/index.js
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import Login from '../views/Login.vue'
@@ -18,14 +19,25 @@ import ChangePassword from '../views/ChangePassword.vue'
 // ============ 模块二：人才培养方案管理 ============
 import CurriculumManagement from '../views/curriculum/CurriculumManagement.vue'
 import ProgramDetail from '../views/curriculum/ProgramDetail.vue'
-// 教师/学生端只读查看
 import CurriculumView from '../views/curriculum/CurriculumView.vue'
 import ProgramView from '../views/curriculum/ProgramView.vue'
+
+// ============ 安全解析 JSON 的辅助函数 ============
+const safeJSONParse = (str, defaultValue = null) => {
+  if (!str || str === 'undefined' || str === 'null' || str === '') {
+    return defaultValue
+  }
+  try {
+    return JSON.parse(str)
+  } catch (e) {
+    console.warn('JSON 解析失败:', str, e)
+    return defaultValue
+  }
+}
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    // ============ 登录页（无需登录） ============
     {
       path: '/login',
       name: 'Login',
@@ -35,14 +47,10 @@ const router = createRouter({
         requiresAuth: false
       }
     },
-
-    // ============ 根路径重定向 ============
     {
       path: '/',
       redirect: '/dashboard'
     },
-
-    // ============ 仪表盘（需要登录） ============
     {
       path: '/dashboard',
       component: Layout,
@@ -63,14 +71,11 @@ const router = createRouter({
         }
       ]
     },
-
-    // ============ 主布局（需要登录） ============
     {
       path: '/app',
       component: Layout,
       meta: { requiresAuth: true },
       children: [
-        // ----- 修改密码（所有角色） -----
         {
           path: 'changePassword',
           name: 'ChangePassword',
@@ -80,8 +85,6 @@ const router = createRouter({
             icon: 'Lock'
           }
         },
-
-        // ----- 个人信息（学生/教师） -----
         {
           path: 'profile',
           name: 'Profile',
@@ -92,8 +95,6 @@ const router = createRouter({
             permissions: ['profile:view']
           }
         },
-
-        // ----- 我的课程（学生/教师共用） -----
         {
           path: 'my-courses',
           name: 'MyCourses',
@@ -104,8 +105,6 @@ const router = createRouter({
             permissions: ['course:list']
           }
         },
-
-        // ----- 课程管理（管理员按专业管理） -----
         {
           path: 'courses/program/:programId',
           name: 'CourseManagement',
@@ -116,8 +115,6 @@ const router = createRouter({
             permissions: ['course:manage']
           }
         },
-
-        // ----- 课程详情（学生端） -----
         {
           path: 'course/:id',
           name: 'CourseDetail',
@@ -127,8 +124,6 @@ const router = createRouter({
             permissions: ['course:detail']
           }
         },
-
-        // ----- 课程管理详情（教师端） -----
         {
           path: 'teacher/course/:id',
           name: 'TeacherCourseManage',
@@ -138,8 +133,6 @@ const router = createRouter({
             permissions: ['course:teach']
           }
         },
-
-        // ----- 课程学生名单（教师端） -----
         {
           path: 'course/:id/students',
           name: 'CourseStudents',
@@ -150,8 +143,6 @@ const router = createRouter({
             permissions: ['course:student-list']
           }
         },
-
-        // ----- 用户管理（仅管理员） -----
         {
           path: 'users',
           name: 'UserManagement',
@@ -162,8 +153,6 @@ const router = createRouter({
             permissions: ['user:list']
           }
         },
-
-        // ----- 角色权限（仅管理员） -----
         {
           path: 'roles',
           name: 'RoleManagement',
@@ -174,10 +163,6 @@ const router = createRouter({
             permissions: ['role:list']
           }
         },
-
-        // ============ 模块二：人才培养方案管理（仅管理员） ============
-
-        // ----- 【管理员】专业详情页（包含 Tab：培养目标、毕业要求、支撑矩阵） -----
         {
           path: 'curriculum/detail/:id',
           name: 'ProgramDetail',
@@ -188,8 +173,6 @@ const router = createRouter({
             permissions: ['program:detail']
           }
         },
-
-        // ----- 【管理员】专业管理（列表页） -----
         {
           path: 'curriculum/management',
           name: 'CurriculumManagement',
@@ -200,10 +183,6 @@ const router = createRouter({
             permissions: ['program:manage']
           }
         },
-
-        // ============ 模块二-查看：人才培养方案查看（教师/学生只读） ============
-
-        // ----- 【教师/学生】专业详情查看页 -----
         {
           path: 'curriculum/view/:id',
           name: 'ProgramView',
@@ -214,8 +193,6 @@ const router = createRouter({
             permissions: ['program:view']
           }
         },
-
-        // ----- 【教师/学生】人才培养方案查看列表 -----
         {
           path: 'curriculum/view',
           name: 'CurriculumView',
@@ -228,8 +205,6 @@ const router = createRouter({
         }
       ]
     },
-
-    // ============ 403 无权限页面 ============
     {
       path: '/403',
       name: 'Forbidden',
@@ -239,8 +214,6 @@ const router = createRouter({
         requiresAuth: false
       }
     },
-
-    // ============ 404 页面 ============
     {
       path: '/:pathMatch(.*)*',
       name: 'NotFound',
@@ -254,74 +227,104 @@ const router = createRouter({
 })
 
 // ============ 路由守卫 ============
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to) => {
   const authStore = useAuthStore()
+
+  console.log('路由守卫 - path:', to.path)
+  console.log('路由守卫 - token:', authStore.token)
+  console.log('路由守卫 - userInfo:', authStore.userInfo)
 
   // 1. 如果访问的是登录页
   if (to.path === '/login') {
     if (authStore.isLoggedIn) {
-      // 已登录，跳转到首页
-      return next(authStore.getHomePath())
+      // 如果 token 存在但 userInfo 不存在，尝试恢复
+      if (!authStore.userInfo) {
+        const savedUserInfo = localStorage.getItem('userInfo')
+        if (savedUserInfo) {
+          authStore.userInfo = safeJSONParse(savedUserInfo, null)
+          console.log('从 localStorage 恢复 userInfo:', authStore.userInfo)
+        }
+        // 如果仍然没有 userInfo，尝试用 restoreUserInfo 方法
+        if (!authStore.userInfo) {
+          authStore.restoreUserInfo()
+        }
+        // 如果还是没有，退出登录
+        if (!authStore.userInfo) {
+          console.warn('userInfo 不存在，退出登录')
+          authStore.logout()
+          return true // 返回 true 表示继续导航到登录页
+        }
+      }
+      // 返回首页路径，替代 next(homePath)
+      return authStore.getHomePath()
     }
-    return next()
+    return true // 继续导航到登录页
   }
 
   // 2. 如果访问的是公开页面（不需要登录）
   if (to.meta.requiresAuth === false) {
-    return next()
+    return true
   }
 
   // 3. 检查是否需要登录
   if (to.meta.requiresAuth !== false) {
     // 未登录，跳转到登录页
     if (!authStore.isLoggedIn) {
-      return next({
-        path: '/login',
-        query: { redirect: to.fullPath }
-      })
+      return { path: '/login', query: { redirect: to.fullPath } }
     }
 
-    // 4. 检查权限（基于权限标识符）
+    // ========== 4. 确保 userInfo 存在 ==========
+    if (!authStore.userInfo) {
+      const savedUserInfo = localStorage.getItem('userInfo')
+      if (savedUserInfo) {
+        authStore.userInfo = safeJSONParse(savedUserInfo, null)
+        console.log('从 localStorage 恢复 userInfo:', authStore.userInfo)
+      }
+
+      if (!authStore.userInfo) {
+        console.warn('userInfo 不存在，退出登录')
+        authStore.logout()
+        return '/login'
+      }
+    }
+
+    // ========== 5. 检查权限 ==========
     const routePermissions = to.meta.permissions
-    if (routePermissions && routePermissions.length > 0) {
-      // 确保用户权限已加载
-      if (!authStore.permissions || authStore.permissions.length === 0) {
-        // 如果权限还没加载，等待加载完成
-        authStore.loadPermissions().then(() => {
-          // 重新检查权限
-          const hasRoutePermission = routePermissions.some(p =>
-              authStore.permissions.includes(p)
-          )
 
-          if (!hasRoutePermission) {
-            console.warn('您没有权限访问该页面:', to.path)
-            return next('/403')
-          }
-          return next()
-        }).catch(() => {
-          // 加载权限失败，跳转到登录页
-          return next('/login')
-        })
-        return
-      }
+    // 如果路由没有定义权限要求，直接放行
+    if (!routePermissions || routePermissions.length === 0) {
+      return true
+    }
 
-      // 权限已加载，直接检查
-      const hasRoutePermission = routePermissions.some(p =>
-          authStore.permissions.includes(p)
-      )
-
-      if (!hasRoutePermission) {
-        console.warn('您没有权限访问该页面:', to.path)
-        return next('/403')
+    // 确保用户权限已加载
+    if (authStore.permissions.length === 0) {
+      try {
+        await authStore.loadPermissions()
+      } catch (error) {
+        console.error('加载权限失败:', error)
+        if (authStore.token && authStore.userInfo) {
+          console.warn('权限加载失败，但用户已登录，继续访问')
+          return true
+        }
+        return '/login'
       }
     }
 
-    // 5. 所有检查通过，正常访问
-    next()
-  } else {
-    // 默认放行
-    next()
+    // 使用 hasPermission 检查权限
+    const hasRoutePermission = routePermissions.some(p =>
+        authStore.hasPermission(p)
+    )
+
+    if (!hasRoutePermission) {
+      console.warn('您没有权限访问该页面:', to.path, '需要的权限:', routePermissions)
+      return '/403'
+    }
+
+    // 6. 所有检查通过，正常访问
+    return true
   }
+
+  return true
 })
 
 export default router

@@ -134,6 +134,22 @@ const goToUserManagement = (roleName) => {
   router.push({ path: '/app/users', query: { role: roleName } })
 }
 
+// ============ 加载用户数量 ============
+const loadUserCounts = async () => {
+  for (const role of roles.value) {
+    try {
+      const res = await request.get('/admin/users/list', {
+        params: { role: role.roleName, pageSize: 1 }
+      })
+      if (res.status === 'success' && res.data) {
+        role.userCount = res.data.total || 0
+      }
+    } catch (error) {
+      console.warn(`加载角色 ${role.roleName} 用户数量失败:`, error)
+    }
+  }
+}
+
 // ============ 数据加载 ============
 const loadRoles = async () => {
   loading.value = true
@@ -146,6 +162,9 @@ const loadRoles = async () => {
         ...(roleTemplates[r.roleName] || { icon: User, iconBg: '#909399', description: '' }),
         userCount: r.userCount || 0
       }))
+
+      // ✅ 角色加载完成后，再加载用户数量
+      await loadUserCounts()
     }
   } catch {
     roles.value = Object.entries(roleTemplates).map(([name, tmpl], index) => ({
@@ -185,6 +204,7 @@ const resetPermDialog = () => {
   permissions.value = []
 }
 
+// ============ 提交权限修改 ============
 const submitPermissionChanges = async () => {
   if (!currentRole.value) return
   saving.value = true
@@ -202,18 +222,18 @@ const submitPermissionChanges = async () => {
       ElMessage.success('权限配置已保存')
       permDialogVisible.value = false
 
-      // ========== 核心修复：刷新当前用户权限 ==========
-      const currentUserRole = authStore.userInfo?.role
-      if (currentUserRole === currentRole.value.roleName) {
-        try {
-          // 调用 /permissions 接口重新加载当前用户权限
-          await authStore.loadPermissions()
-          ElMessage.success('当前用户权限已同步更新')
+      const currentUserRole = authStore.userInfo?.role?.toLowerCase()
+      const modifiedRole = currentRole.value.roleName?.toLowerCase()
 
-          // 延迟后自动刷新页面，让菜单完全重新渲染
-          setTimeout(() => {
-            window.location.reload()
-          }, 800)
+      if (currentUserRole === modifiedRole) {
+        try {
+          await authStore.forceRefreshPermissions()
+
+          const hasDashboard = authStore.hasPermission('dashboard:view')
+          console.log('刷新后是否有 dashboard:view:', hasDashboard)
+          console.log('当前权限列表:', authStore.permissions)
+
+          ElMessage.success('当前用户权限已同步更新，菜单已自动刷新')
         } catch (permError) {
           console.error('刷新权限失败:', permError)
           ElMessage.warning('权限已保存，但刷新当前用户权限失败，请手动刷新页面')
@@ -235,23 +255,7 @@ const submitPermissionChanges = async () => {
 // ============ 生命周期 ============
 onMounted(() => {
   loadRoles()
-  loadUserCounts()
 })
-
-const loadUserCounts = async () => {
-  for (const role of roles.value) {
-    try {
-      const res = await request.get('/admin/users/list', {
-        params: { role: role.roleName, pageSize: 1 }
-      })
-      if (res.status === 'success' && res.data) {
-        role.userCount = res.data.total || 0
-      }
-    } catch {
-      // 忽略
-    }
-  }
-}
 </script>
 
 <style scoped>
