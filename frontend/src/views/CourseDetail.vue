@@ -170,7 +170,7 @@ const loadObjectives = async (offeringId) => {
 const loadResources = async (offeringId) => {
   resLoading.value = true
   try {
-    const res = await request.get(`/teacher/resources/offering/${offeringId}`)
+    const res = await request.get(`/student/resources/${offeringId}`)
     if (res.status === 'success' && res.data) {
       resources.value = res.data
     }

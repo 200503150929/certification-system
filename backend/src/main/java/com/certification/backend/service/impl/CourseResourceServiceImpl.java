@@ -9,6 +9,7 @@ import com.certification.backend.enums.ResultCodeEnum;
 import com.certification.backend.exception.BusinessException;
 import com.certification.backend.repository.CourseOfferingRepository;
 import com.certification.backend.repository.CourseResourceRepository;
+import com.certification.backend.repository.StudentCourseRepository;
 import com.certification.backend.repository.UserRepository;
 import com.certification.backend.service.CourseResourceService;
 import org.slf4j.Logger;
@@ -39,6 +40,7 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
     private final CourseResourceRepository resourceRepository;
     private final CourseOfferingRepository offeringRepository;
+    private final StudentCourseRepository studentCourseRepository;
     private final UserRepository userRepository;
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -56,9 +58,11 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
     public CourseResourceServiceImpl(CourseResourceRepository resourceRepository,
                                      CourseOfferingRepository offeringRepository,
+                                     StudentCourseRepository studentCourseRepository,
                                      UserRepository userRepository) {
         this.resourceRepository = resourceRepository;
         this.offeringRepository = offeringRepository;
+        this.studentCourseRepository = studentCourseRepository;
         this.userRepository = userRepository;
     }
 
@@ -165,6 +169,20 @@ public class CourseResourceServiceImpl implements CourseResourceService {
         }
 
         resourceRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseResourceResponse> listByOfferingIdForStudent(Long offeringId, String username) {
+        // 校验学生是否选修了该课程
+        User student = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.UNAUTHORIZED, "用户不存在"));
+
+        studentCourseRepository.findByStudentIdAndOfferingId(student.getId(), offeringId)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.FORBIDDEN, "您未选修该课程"));
+
+        List<CourseResource> resources = resourceRepository.findByOfferingId(offeringId);
+        return resources.stream().map(this::toResponse).collect(Collectors.toList());
     }
 
     // ==================== 私有方法 ====================

@@ -4,7 +4,6 @@
       <template #header>
         <div class="card-header">
           <span>角色权限管理</span>
-          <el-button type="primary" :icon="Plus">新增角色</el-button>
         </div>
         <p class="header-description">维护系统角色及其对应的功能菜单、数据访问权限范围。</p>
       </template>
@@ -37,7 +36,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, User, Avatar, School, OfficeBuilding } from '@element-plus/icons-vue'
+import { User, Avatar, School, OfficeBuilding } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
 const router = useRouter()

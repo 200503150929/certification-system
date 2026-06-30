@@ -103,11 +103,6 @@
         </div>
 
         <div class="header-right">
-          <!-- 通知 -->
-          <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
-            <el-icon class="header-icon"><Bell /></el-icon>
-          </el-badge>
-
           <!-- 用户下拉菜单 -->
           <el-dropdown @command="handleCommand">
             <span class="el-dropdown-link">
@@ -151,7 +146,6 @@ import {
   Monitor,
   Connection,
   User,
-  Bell,
   ArrowDown,
   UserFilled,
   Document,
@@ -169,7 +163,6 @@ const authStore = useAuthStore()
 
 // ============ 状态 ============
 const isCollapse = ref(false)
-const notificationCount = ref(3)
 
 // ============ 用户信息 ============
 const userInfo = ref({
@@ -494,9 +487,6 @@ onMounted(() => {
 }
 .header-icon:hover {
   color: #409EFF;
-}
-.notification-badge :deep(.el-badge__content) {
-  margin-top: 4px;
 }
 .el-dropdown-link {
   display: flex;

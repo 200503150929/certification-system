@@ -1,10 +1,12 @@
 package com.certification.backend.controller.student;
 
 import com.certification.backend.dto.response.CourseObjectiveResponse;
+import com.certification.backend.dto.response.CourseResourceResponse;
 import com.certification.backend.dto.response.ResponseVO;
 import com.certification.backend.dto.response.StudentCourseResponse;
 import com.certification.backend.dto.response.StudentGradeResponse;
 import com.certification.backend.service.CourseObjectiveService;
+import com.certification.backend.service.CourseResourceService;
 import com.certification.backend.service.StudentCourseService;
 import com.certification.backend.service.StudentGradeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -30,13 +32,16 @@ public class StudentCourseController {
     private final StudentCourseService studentCourseService;
     private final StudentGradeService studentGradeService;
     private final CourseObjectiveService courseObjectiveService;
+    private final CourseResourceService courseResourceService;
 
     public StudentCourseController(StudentCourseService studentCourseService,
                                    StudentGradeService studentGradeService,
-                                   CourseObjectiveService courseObjectiveService) {
+                                   CourseObjectiveService courseObjectiveService,
+                                   CourseResourceService courseResourceService) {
         this.studentCourseService = studentCourseService;
         this.studentGradeService = studentGradeService;
         this.courseObjectiveService = courseObjectiveService;
+        this.courseResourceService = courseResourceService;
     }
 
     /**
@@ -71,5 +76,16 @@ public class StudentCourseController {
     public ResponseVO<List<CourseObjectiveResponse>> myObjectives(@PathVariable Long offeringId) {
         String username = SecurityContextHolder.getContext().getAuthentication().getName();
         return ResponseVO.success(courseObjectiveService.listByOfferingIdForStudent(offeringId, username));
+    }
+
+    /**
+     * 查看指定开课下的课程资源
+     * GET /api/student/resources/{offeringId}
+     */
+    @Operation(summary = "查看课程资源", description = "根据当前登录 Token 和开课ID返回课程资源列表（仅限已选修该课程的学生）")
+    @GetMapping("/resources/{offeringId}")
+    public ResponseVO<List<CourseResourceResponse>> myResources(@PathVariable Long offeringId) {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        return ResponseVO.success(courseResourceService.listByOfferingIdForStudent(offeringId, username));
     }
 }

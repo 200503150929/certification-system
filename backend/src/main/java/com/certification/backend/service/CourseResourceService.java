@@ -45,4 +45,9 @@ public interface CourseResourceService {
      * 删除指定资源（同时删除磁盘文件）
      */
     void delete(Long id, String username);
+
+    /**
+     * 学生端查询指定开课记录下的所有资源（校验学生是否选修了该课程）
+     */
+    List<CourseResourceResponse> listByOfferingIdForStudent(Long offeringId, String username);
 }

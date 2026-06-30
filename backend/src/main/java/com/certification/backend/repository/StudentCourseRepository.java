@@ -32,4 +32,9 @@ public interface StudentCourseRepository extends JpaRepository<StudentCourse, Lo
      * 根据开课ID删除所有选课记录
      */
     void deleteByOfferingId(Long offeringId);
+
+    /**
+     * 根据学生ID和开课ID查询选课记录（用于校验学生是否选修了该课程）
+     */
+    java.util.Optional<StudentCourse> findByStudentIdAndOfferingId(Long studentId, Long offeringId);
 }
