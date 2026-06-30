@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { redirectToLogin } from '@/utils/navigation'
 
 // 创建 axios 实例
 const request = axios.create({
@@ -40,7 +41,7 @@ request.interceptors.response.use(
         localStorage.removeItem('userRole')
         localStorage.removeItem('username')
         localStorage.removeItem('displayName')
-        window.location.href = '/login'
+        redirectToLogin()
         return Promise.reject(error)
       } else if (status === 403) {
         ElMessage.error('没有权限访问')
