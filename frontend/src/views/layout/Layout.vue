@@ -96,9 +96,6 @@
         </div>
 
         <div class="header-right">
-          <el-badge :value="notificationCount" :hidden="notificationCount === 0" class="notification-badge">
-            <el-icon class="header-icon"><Bell /></el-icon>
-          </el-badge>
 
           <el-dropdown @command="handleCommand">
             <span class="el-dropdown-link">
