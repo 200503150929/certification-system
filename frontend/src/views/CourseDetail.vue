@@ -139,7 +139,6 @@ const getResourceTypeTag = (type) => {
     '参考资料': 'warning',
     '习题': 'danger',
     '实验指导': 'info',
-    '视频': '',
     '其他': 'info'
   }
   return map[type] || 'info'

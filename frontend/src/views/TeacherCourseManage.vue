@@ -294,7 +294,6 @@
             <el-option label="参考资料" value="参考资料" />
             <el-option label="习题" value="习题" />
             <el-option label="实验指导" value="实验指导" />
-            <el-option label="视频" value="视频" />
             <el-option label="其他" value="其他" />
           </el-select>
         </el-form-item>
@@ -585,7 +584,6 @@ const getResourceTypeTag = (type) => {
     '参考资料': 'warning',
     '习题': 'danger',
     '实验指导': 'info',
-    '视频': '',
     '其他': 'info'
   }
   return map[type] || 'info'
