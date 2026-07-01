@@ -145,20 +145,12 @@
 
         <!-- ========== 学生名单 Tab ========== -->
         <el-tab-pane label="学生名单" name="students">
-          <div class="toolbar">
-            <el-input v-model="studentKeyword" placeholder="搜索姓名/学号" style="width: 260px" clearable />
-            <el-button type="primary" :icon="Download" @click="exportStudentList">导出学生成绩</el-button>
-          </div>
-          <el-table :data="filteredStudents" border style="width: 100%" v-loading="studentsLoading">
-            <el-table-column prop="studentNo" label="学号" width="120" />
-            <el-table-column prop="studentName" label="姓名" width="100" />
-            <el-table-column label="最终成绩" align="center">
-              <template #default="scope">
-                <span v-if="scope.row.totalScore != null" style="font-weight: 600">{{ scope.row.totalScore }}</span>
-                <span v-else style="color: #999">未录入</span>
-              </template>
-            </el-table-column>
-          </el-table>
+          <StudentImport
+              ref="studentImportRef"
+              :offering-id="offeringId"
+              @refresh="handleStudentRefresh"
+              @student-count-change="handleStudentCountChange"
+          />
         </el-tab-pane>
 
         <!-- ========== 成绩录入 Tab ========== -->
@@ -387,6 +379,8 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Plus, Upload, UploadFilled, Check } from '@element-plus/icons-vue'
 import request from '@/api/request'
+// ========== 新增：引入学生名单管理组件 ==========
+import StudentImport from '@/views/teacher/components/StudentImport.vue'
 
 const route = useRoute()
 const offeringId = computed(() => route.params.id)
@@ -664,11 +658,12 @@ const fetchCourseInfo = async () => {
   }
 }
 
-// ============ 加载学生名单 ============
+// ============ 加载学生名单（用于统计人数） ============
 const fetchStudents = async () => {
   studentsLoading.value = true
   try {
-    const res = await request.get(`/teacher/student-grades/offering/${offeringId.value}`)
+    // 使用新接口获取学生名单
+    const res = await request.get(`/teacher/student-course/list/${offeringId.value}`)
     if (res.status === 'success' && res.data) {
       rawStudents.value = res.data
     }
@@ -719,7 +714,7 @@ const fetchWeights = async () => {
       gradeWeights.value = res.data
     }
   } catch (e) {
-    gradeWeights.value = { dailyWeight: 0.25, reportWeight: 0.25, midtermWeight: 0.25, finalWeight: 0.25 }
+    gradeWeights.value = {dailyWeight: 0.25, reportWeight: 0.25, midtermWeight: 0.25, finalWeight: 0.25}
   }
 }
 
@@ -834,7 +829,7 @@ const handleGradeImportError = () => {
 const exportStudentGrades = () => {
   const token = localStorage.getItem('token')
   const url = `/api/teacher/student-grades/export/${offeringId.value}`
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  fetch(url, {headers: {Authorization: `Bearer ${token}`}})
       .then(res => {
         if (!res.ok) throw new Error('导出失败')
         return res.blob()
@@ -886,10 +881,10 @@ const fetchObjectives = async () => {
 const openObjectiveDialog = (row) => {
   if (row) {
     editingObjectiveId.value = row.id
-    objForm.value = { code: row.code || '', description: row.description || '', weight: row.weight || 0.5 }
+    objForm.value = {code: row.code || '', description: row.description || '', weight: row.weight || 0.5}
   } else {
     editingObjectiveId.value = null
-    objForm.value = { code: '', description: '', weight: 0.5 }
+    objForm.value = {code: '', description: '', weight: 0.5}
   }
   objectiveDialogVisible.value = true
 }
@@ -897,7 +892,7 @@ const openObjectiveDialog = (row) => {
 const submitObjective = async () => {
   objSubmitting.value = true
   try {
-    const body = { ...objForm.value }
+    const body = {...objForm.value}
     if (editingObjectiveId.value) {
       await request.put(`/teacher/objectives/${editingObjectiveId.value}`, body)
       ElMessage.success('课程目标已更新')
@@ -927,7 +922,8 @@ const deleteObjective = (row) => {
     } catch (e) {
       // 已提示
     }
-  }).catch(() => {})
+  }).catch(() => {
+  })
 }
 
 // ============ 资源 ============
@@ -948,7 +944,7 @@ const fetchResources = async () => {
 const downloadResource = (row) => {
   const token = localStorage.getItem('token')
   const url = `/api/teacher/resources/download/${row.id}`
-  fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  fetch(url, {headers: {Authorization: `Bearer ${token}`}})
       .then(res => res.blob())
       .then(blob => {
         const blobUrl = window.URL.createObjectURL(blob)
@@ -974,21 +970,47 @@ const deleteResource = (row) => {
     } catch (e) {
       // 已提示
     }
-  }).catch(() => {})
+  }).catch(() => {
+  })
+}
+
+// ============ 学生名单组件引用 ============
+const studentImportRef = ref(null)
+
+// ============ 学生名单刷新回调 ============
+const handleStudentRefresh = () => {
+  // 刷新统计数据（学生人数会通过 rawStudents 自动更新）
+  fetchStudents()
+}
+
+const handleStudentCountChange = (count) => {
+  // 可选：处理学生人数变化
+  console.log('学生人数已更新:', count)
 }
 
 // ============ Tab 切换 ============
 const handleTabChange = (tab) => {
   switch (tab) {
-    case 'students': fetchStudents(); break
+    case 'students':
+      // 调用子组件刷新
+      if (studentImportRef.value) {
+        studentImportRef.value.loadStudents()
+      } else {
+        fetchStudents()
+      }
+      break
     case 'grades':
       fetchWeights().then(() => {
         fetchStudentGrades().then(() => recalcColumnWidth())
       })
       fetchAssessments()
       break
-    case 'objectives': fetchObjectives(); break
-    case 'resources': fetchResources(); break
+    case 'objectives':
+      fetchObjectives()
+      break
+    case 'resources':
+      fetchResources()
+      break
   }
 }
 
@@ -1010,7 +1032,9 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.teacher-course-manage-container { padding: 20px; }
+.teacher-course-manage-container {
+  padding: 20px;
+}
 
 .course-header {
   display: flex;
@@ -1071,6 +1095,7 @@ onUnmounted(() => {
   gap: 12px;
   align-items: center;
 }
+
 .weight-tag {
   padding: 2px 10px;
   border-radius: 4px;
@@ -1092,47 +1117,176 @@ onUnmounted(() => {
   width: 100%;
   text-align: center;
 }
+
 .score-cell.empty {
   color: #c0c4cc;
 }
+
 .score-cell.total-score {
   font-weight: 600;
   color: #303133;
 }
 
 /* ========== 矩阵样式 ========== */
-.matrix-section { margin-top: 24px; }
-.matrix-section .tab-header {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+.matrix-section {
+  margin-top: 24px;
 }
-.matrix-section .header-left { display: flex; align-items: center; gap: 12px; }
-.matrix-section .tab-title { font-size: 15px; font-weight: 500; color: #303133; }
 
-.obj-label { font-weight: 600; color: #409EFF; font-size: 13px; }
+.matrix-section .tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
 
-.indicator-header { display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.indicator-code { font-weight: 600; color: #303133; font-size: 13px; cursor: help; }
-.indicator-req { font-size: 11px; color: #909399; }
+.matrix-section .header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.matrix-section .tab-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.obj-label {
+  font-weight: 600;
+  color: #409EFF;
+  font-size: 13px;
+}
+
+.indicator-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.indicator-code {
+  font-weight: 600;
+  color: #303133;
+  font-size: 13px;
+  cursor: help;
+}
+
+.indicator-req {
+  font-size: 11px;
+  color: #909399;
+}
 
 /* 下拉框选中的颜色 */
-:deep(.ss-h .el-input__wrapper) { background-color: #fef0f0 !important; border-color: #f56c6c !important; }
-:deep(.ss-h .el-input__wrapper:hover) { border-color: #f56c6c !important; }
-:deep(.ss-h .el-select__selected-item) { color: #f56c6c !important; font-weight: 700; }
-:deep(.ss-m .el-input__wrapper) { background-color: #fdf6ec !important; border-color: #e6a23c !important; }
-:deep(.ss-m .el-input__wrapper:hover) { border-color: #e6a23c !important; }
-:deep(.ss-m .el-select__selected-item) { color: #e6a23c !important; font-weight: 700; }
-:deep(.ss-l .el-input__wrapper) { background-color: #f0f9eb !important; border-color: #67c23a !important; }
-:deep(.ss-l .el-input__wrapper:hover) { border-color: #67c23a !important; }
-:deep(.ss-l .el-select__selected-item) { color: #67c23a !important; font-weight: 700; }
-:deep(.ss-n .el-input__wrapper) { background-color: #f5f7fa !important; border-color: #dcdfe6 !important; }
-:deep(.ss-n .el-select__selected-item) { color: #c0c4cc !important; }
+:deep(.ss-h .el-input__wrapper) {
+  background-color: #fef0f0 !important;
+  border-color: #f56c6c !important;
+}
 
-.so { font-weight: 700; font-size: 14px; }
-.so-h { color: #f56c6c; } .so-m { color: #e6a23c; } .so-l { color: #67c23a; } .so-none { color: #c0c4cc; }
+:deep(.ss-h .el-input__wrapper:hover) {
+  border-color: #f56c6c !important;
+}
 
-.matrix-legend { margin-top: 12px; padding: 10px 16px; background: #f7f8fa; border-radius: 6px;
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; font-size: 13px; }
-.matrix-legend .legend-title { font-weight: 600; color: #333; }
-.sh { color: #f56c6c; font-weight: 500; } .sm { color: #e6a23c; font-weight: 500; }
-.sl { color: #67c23a; font-weight: 500; } .sn { color: #c0c4cc; font-weight: 500; }
+:deep(.ss-h .el-select__selected-item) {
+  color: #f56c6c !important;
+  font-weight: 700;
+}
+
+:deep(.ss-m .el-input__wrapper) {
+  background-color: #fdf6ec !important;
+  border-color: #e6a23c !important;
+}
+
+:deep(.ss-m .el-input__wrapper:hover) {
+  border-color: #e6a23c !important;
+}
+
+:deep(.ss-m .el-select__selected-item) {
+  color: #e6a23c !important;
+  font-weight: 700;
+}
+
+:deep(.ss-l .el-input__wrapper) {
+  background-color: #f0f9eb !important;
+  border-color: #67c23a !important;
+}
+
+:deep(.ss-l .el-input__wrapper:hover) {
+  border-color: #67c23a !important;
+}
+
+:deep(.ss-l .el-select__selected-item) {
+  color: #67c23a !important;
+  font-weight: 700;
+}
+
+:deep(.ss-n .el-input__wrapper) {
+  background-color: #f5f7fa !important;
+  border-color: #dcdfe6 !important;
+}
+
+:deep(.ss-n .el-input__wrapper:hover) {
+  border-color: #dcdfe6 !important;
+}
+
+:deep(.ss-n .el-select__selected-item) {
+  color: #c0c4cc !important;
+}
+
+.so {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.so-h {
+  color: #f56c6c;
+}
+
+.so-m {
+  color: #e6a23c;
+}
+
+.so-l {
+  color: #67c23a;
+}
+
+.so-none {
+  color: #c0c4cc;
+}
+
+.matrix-legend {
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: #f7f8fa;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+
+.matrix-legend .legend-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.sh {
+  color: #f56c6c;
+  font-weight: 500;
+}
+
+.sm {
+  color: #e6a23c;
+  font-weight: 500;
+}
+
+.sl {
+  color: #67c23a;
+  font-weight: 500;
+}
+
+.sn {
+  color: #c0c4cc;
+  font-weight: 500;
+}
 </style>

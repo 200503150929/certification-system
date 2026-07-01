@@ -430,4 +430,45 @@ public class ExcelUtil {
         }
         return result;
     }
+
+
+    /**
+     * 从 Excel 文件中读取学号列表（只读第一列）
+     *
+     * Excel 格式要求：
+     * 第 1 行：表头（自动跳过）
+     * 第 1 列：学号
+     *
+     * @param file 上传的 Excel 文件
+     * @return 学号列表
+     */
+    public static List<String> readStudentNosFromExcel(MultipartFile file) {
+        List<String> studentNos = new ArrayList<>();
+
+        try (InputStream in = file.getInputStream()) {
+            List<List<String>> rows = readAllRows(in);
+
+            // 跳过第一行表头（从索引 1 开始）
+            for (int i = 1; i < rows.size(); i++) {
+                List<String> row = rows.get(i);
+                if (row == null || row.isEmpty()) {
+                    continue;
+                }
+
+                // 第 1 列：学号
+                String studentNo = getCell(row, 0);
+                if (studentNo == null || studentNo.isEmpty()) {
+                    continue;
+                }
+
+                studentNos.add(studentNo.trim());
+            }
+        } catch (IOException e) {
+            log.error("读取 Excel 文件失败", e);
+            throw new RuntimeException("Excel 文件读取失败: " + e.getMessage(), e);
+        }
+
+        log.info("Excel 学号导入解析完成，共解析 {} 条记录", studentNos.size());
+        return studentNos;
+    }
 }

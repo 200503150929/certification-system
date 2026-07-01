@@ -87,7 +87,7 @@ public class UserController {
 
     @Operation(
             summary = "批量导入用户（Excel）",
-            description = "上传 Excel 文件批量导入用户，文件需包含：用户名、姓名、角色、电话、邮箱、院系"
+            description = "上传 Excel 文件批量导入用户，文件需包含：工号/学号、姓名、角色、电话、邮箱、院系"
     )
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseVO<String> importUsers(

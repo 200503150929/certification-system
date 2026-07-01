@@ -1,6 +1,8 @@
 package com.certification.backend.service;
 
+import com.certification.backend.dto.response.ImportResultResponse;
 import com.certification.backend.dto.response.StudentCourseResponse;
+import com.certification.backend.dto.response.StudentInfoResponse;
 
 import java.util.List;
 
@@ -11,10 +13,26 @@ public interface StudentCourseService {
 
     /**
      * 根据学生用户名查询其所有选课记录
-     *
-     * @param username 学生用户名（学号）
-     * @return 学生课程列表
      */
     List<StudentCourseResponse> getStudentCourses(String username);
 
+    /**
+     * 获取开课记录的学生名单
+     */
+    List<StudentInfoResponse> getStudentsByOffering(Long offeringId, String teacherUsername);
+
+    /**
+     * 批量导入学生
+     */
+    ImportResultResponse importStudents(Long offeringId, List<String> studentNos, String teacherUsername);
+
+    /**
+     * 移除单个学生
+     */
+    void removeStudent(Long offeringId, Long studentId, String teacherUsername);
+
+    /**
+     * 批量移除学生
+     */
+    ImportResultResponse batchRemoveStudents(Long offeringId, List<Long> studentIds, String teacherUsername);
 }

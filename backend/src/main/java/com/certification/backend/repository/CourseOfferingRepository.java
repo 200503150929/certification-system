@@ -1,6 +1,8 @@
 package com.certification.backend.repository;
 
 import com.certification.backend.entity.CourseOffering;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -35,4 +37,10 @@ public interface CourseOfferingRepository extends JpaRepository<CourseOffering, 
      * 按学年和学期查询开课记录
      */
     List<CourseOffering> findByAcademicYearAndSemester(String academicYear, String semester);
+    // CourseOfferingRepository.java 新增
+
+    /**
+     * 分页查询某课程的所有开课记录
+     */
+    Page<CourseOffering> findByCourseId(Long courseId, PageRequest pageRequest);
 }

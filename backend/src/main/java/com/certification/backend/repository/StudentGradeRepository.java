@@ -27,4 +27,8 @@ public interface StudentGradeRepository extends JpaRepository<StudentGrade, Long
      * 根据开课ID删除所有成绩记录（开课删除时联动清理）
      */
     void deleteByOfferingId(Long offeringId);
+    // StudentGradeRepository.java
+    boolean existsByOfferingIdAndStudentId(Long offeringId, Long studentId);
+
+
 }

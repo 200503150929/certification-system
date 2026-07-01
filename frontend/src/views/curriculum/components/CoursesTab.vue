@@ -15,7 +15,9 @@
             @keyup.enter="handleSearch"
         />
         <el-button @click="handleSearch">搜索</el-button>
-        <el-button :icon="Download" v-if="!disabled" @click="handleExport" :loading="exporting">导出</el-button>
+        <el-button :icon="Download" v-if="!disabled" @click="handleExport" :loading="exporting">
+          导出
+        </el-button>
       </div>
     </div>
 
@@ -59,13 +61,17 @@
           {{ scope.row.semester || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="300" fixed="right">
         <template #default="scope">
           <el-button link type="primary" :icon="Edit" @click="openEditDialog(scope.row)" :disabled="disabled">
             编辑
           </el-button>
           <el-button link type="danger" :icon="Delete" @click="handleDelete(scope.row)" :disabled="disabled">
             删除
+          </el-button>
+          <!-- 新增：开课管理按钮 -->
+          <el-button link type="primary" @click="openOfferingManagement(scope.row)">
+            开课管理
           </el-button>
         </template>
       </el-table-column>
@@ -132,6 +138,14 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 开课管理弹窗 -->
+    <OfferingManagement
+        v-model:visible="offeringDialogVisible"
+        :course-id="selectedCourseId"
+        :course-name="selectedCourseName"
+        @success="handleOfferingSuccess"
+    />
   </div>
 </template>
 
@@ -140,6 +154,7 @@ import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Download } from '@element-plus/icons-vue'
 import request from '@/api/request'
+import OfferingManagement from './OfferingManagement.vue'
 
 const props = defineProps({
   programId: {
@@ -190,6 +205,11 @@ const formRules = {
 }
 
 const dialogTitle = computed(() => isEdit.value ? '编辑课程' : '新增课程')
+
+// ============ 开课管理 ============
+const offeringDialogVisible = ref(false)
+const selectedCourseId = ref(null)
+const selectedCourseName = ref('')
 
 // ============ 加载课程列表 ============
 const fetchCourses = async () => {
@@ -344,6 +364,18 @@ const resetForm = () => {
   form.isRequired = true
   isEdit.value = false
   editingId.value = null
+}
+
+// ============ 开课管理 ============
+const openOfferingManagement = (row) => {
+  selectedCourseId.value = row.id
+  selectedCourseName.value = row.name
+  offeringDialogVisible.value = true
+}
+
+const handleOfferingSuccess = () => {
+  // 开课记录变更后刷新课程列表（显示最新的开课状态）
+  fetchCourses()
 }
 
 // ============ 监听 ============

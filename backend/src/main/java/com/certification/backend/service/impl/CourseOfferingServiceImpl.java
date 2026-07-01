@@ -1,9 +1,11 @@
 package com.certification.backend.service.impl;
 
+import com.certification.backend.dto.request.AdminCourseOfferingRequest;
 import com.certification.backend.dto.request.CourseOfferingRequest;
 import com.certification.backend.dto.request.PageQuery;
 import com.certification.backend.dto.response.CourseOfferingResponse;
 import com.certification.backend.dto.response.PageResult;
+import com.certification.backend.dto.response.TeacherSimpleResponse;
 import com.certification.backend.entity.Course;
 import com.certification.backend.entity.CourseOffering;
 import com.certification.backend.entity.User;
@@ -51,6 +53,8 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
         this.userRepository = userRepository;
         this.studentCourseRepository = studentCourseRepository;
     }
+
+    // ==================== 教师端方法 ====================
 
     @Override
     @Transactional(readOnly = true)
@@ -185,12 +189,149 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
             throw new BusinessException(ResultCodeEnum.FORBIDDEN, "无权删除该开课记录");
         }
 
-        // 检查是否存在关联的学生选课记录，若有则阻止删除
         if (studentCourseRepository.existsByOfferingId(id)) {
             throw new BusinessException(ResultCodeEnum.BAD_REQUEST, "该开课记录已有关联的学生选课记录，无法删除");
         }
 
         offeringRepository.deleteById(id);
+    }
+
+    // ==================== 管理员端方法（新增） ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<CourseOfferingResponse> listByCourseId(Long courseId, PageQuery pageQuery) {
+        // 验证课程是否存在
+        courseRepository.findById(courseId)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程不存在"));
+
+        PageRequest pageRequest = PageRequest.of(
+                pageQuery.getPageNum() - 1,
+                pageQuery.getPageSize(),
+                Sort.by(Sort.Direction.DESC, "createdAt")
+        );
+
+        Page<CourseOffering> page = offeringRepository.findByCourseId(courseId, pageRequest);
+
+        List<CourseOfferingResponse> list = page.getContent().stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        PageResult<CourseOfferingResponse> result = new PageResult<>();
+        result.setList(list);
+        result.setTotal(page.getTotalElements());
+        result.setPageNum(pageQuery.getPageNum());
+        result.setPageSize(pageQuery.getPageSize());
+        return result;
+    }
+
+    @Override
+    public CourseOfferingResponse addOfferingByAdmin(AdminCourseOfferingRequest request) {
+        // 验证课程是否存在
+        Course course = courseRepository.findById(request.getCourseId())
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程不存在"));
+
+        // 验证教师是否存在
+        User teacher = userRepository.findById(request.getTeacherId())
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "教师不存在"));
+
+        // 验证教师角色
+        if (!"teacher".equals(teacher.getRole())) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST, "选择的用户不是教师");
+        }
+
+        // 检查是否已存在相同的开课记录（同一课程、同一教师、同一学年学期）
+        if (offeringRepository.existsByCourseIdAndTeacherIdAndAcademicYearAndSemester(
+                request.getCourseId(), request.getTeacherId(),
+                request.getAcademicYear(), request.getSemester())) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST,
+                    "该课程在当前学年学期已存在开课记录（同一教师）");
+        }
+
+        CourseOffering offering = new CourseOffering();
+        offering.setCourseId(request.getCourseId());
+        offering.setTeacherId(request.getTeacherId());
+        offering.setAcademicYear(request.getAcademicYear());
+        offering.setSemester(request.getSemester());
+
+        CourseOffering saved = offeringRepository.save(offering);
+        return toResponse(saved);
+    }
+
+    @Override
+    public CourseOfferingResponse updateOfferingByAdmin(AdminCourseOfferingRequest request) {
+        if (request.getId() == null) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST, "开课记录ID不能为空");
+        }
+
+        CourseOffering offering = offeringRepository.findById(request.getId())
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "开课记录不存在"));
+
+        // 更新课程
+        if (request.getCourseId() != null && !request.getCourseId().equals(offering.getCourseId())) {
+            courseRepository.findById(request.getCourseId())
+                    .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程不存在"));
+            offering.setCourseId(request.getCourseId());
+        }
+
+        // 更新教师
+        if (request.getTeacherId() != null && !request.getTeacherId().equals(offering.getTeacherId())) {
+            User teacher = userRepository.findById(request.getTeacherId())
+                    .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "教师不存在"));
+            if (!"teacher".equals(teacher.getRole())) {
+                throw new BusinessException(ResultCodeEnum.BAD_REQUEST, "选择的用户不是教师");
+            }
+            offering.setTeacherId(request.getTeacherId());
+        }
+
+        if (StringUtils.hasText(request.getAcademicYear())) {
+            offering.setAcademicYear(request.getAcademicYear());
+        }
+        if (StringUtils.hasText(request.getSemester())) {
+            offering.setSemester(request.getSemester());
+        }
+
+        // 检查重复（排除自身）
+        if (offeringRepository.existsByCourseIdAndTeacherIdAndAcademicYearAndSemesterAndIdNot(
+                offering.getCourseId(), offering.getTeacherId(),
+                offering.getAcademicYear(), offering.getSemester(),
+                offering.getId())) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST,
+                    "该课程在当前学年学期已存在开课记录（同一教师）");
+        }
+
+        CourseOffering saved = offeringRepository.save(offering);
+        return toResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void deleteOfferingByAdmin(Long id) {
+        CourseOffering offering = offeringRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "开课记录不存在"));
+
+        // 检查是否存在关联的学生选课记录
+        if (studentCourseRepository.existsByOfferingId(id)) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST,
+                    "该开课记录已有关联的学生选课记录，无法删除");
+        }
+
+        offeringRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TeacherSimpleResponse> listTeachers() {
+        // 查询所有角色为 teacher 的用户
+        List<User> teachers = userRepository.findByRole("teacher");
+        return teachers.stream().map(user -> {
+            TeacherSimpleResponse resp = new TeacherSimpleResponse();
+            resp.setId(user.getId());
+            resp.setName(user.getName());
+            resp.setUsername(user.getUsername());
+            resp.setCollege(user.getCollege());
+            return resp;
+        }).collect(Collectors.toList());
     }
 
     // ==================== 私有方法 ====================
