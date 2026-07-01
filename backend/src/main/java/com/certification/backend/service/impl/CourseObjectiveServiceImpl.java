@@ -77,7 +77,8 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
 
         CourseObjective objective = new CourseObjective();
         objective.setOfferingId(offeringId);
-        objective.setCode(request.getCode());
+        // 自动生成编号（如未提供）：查找该开课下已有目标数，生成 CO1, CO2, ...
+        objective.setCode(generateCode(offeringId, request.getCode()));
         objective.setDescription(request.getDescription());
         objective.setWeight(request.getWeight());
 
@@ -125,6 +126,28 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
     }
 
     // ==================== 私有方法 ====================
+
+    /**
+     * 自动生成课程目标编号（如 CO1, CO2, ...）
+     * 如果用户已提供编号则直接使用，否则在该开课下自动递增
+     */
+    private String generateCode(Long offeringId, String providedCode) {
+        if (providedCode != null && !providedCode.isBlank()) {
+            return providedCode.trim();
+        }
+        List<CourseObjective> existing = objectiveRepository.findByOfferingId(offeringId);
+        int maxNum = 0;
+        for (CourseObjective obj : existing) {
+            String code = obj.getCode();
+            if (code != null && code.startsWith("CO")) {
+                try {
+                    int num = Integer.parseInt(code.substring(2));
+                    if (num > maxNum) maxNum = num;
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        return "CO" + (maxNum + 1);
+    }
 
     /**
      * 获取开课记录并校验当前用户是否为该记录的授课教师

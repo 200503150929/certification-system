@@ -112,7 +112,7 @@ const handleSearch = () => {
 // ============ 跳转到只读详情页 ============
 const goToDetail = (row) => {
   router.push({
-    path: `/curriculum/view/${row.id}`
+    path: `/app/curriculum/view/${row.id}`
   })
 }
 

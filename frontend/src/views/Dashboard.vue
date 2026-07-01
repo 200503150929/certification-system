@@ -36,13 +36,39 @@
     <el-row :gutter="20">
       <el-col :span="12">
         <el-card shadow="never">
-          <template #header>毕业要求指标点达成度柱状图</template>
+          <template #header>
+            <span>毕业要求指标点达成度柱状图</span>
+            <el-tooltip placement="bottom" effect="dark" raw-content>
+              <template #content>
+                <div style="max-width:360px;line-height:1.8">
+                  <p style="margin:0 0 8px;font-weight:bold">计算说明：</p>
+                  <p style="margin:0 0 4px">① 课程目标达成度 = 全班学生加权平均分 ÷ 100<br/>（加权：平时×25% + 实验×25% + 期中×25% + 期末×25%）</p>
+                  <p style="margin:0 0 4px">② 指标点达成度 = Σ(课程目标达成度 × 支撑强度权重) ÷ Σ权重<br/>（支撑强度权重：H=1.0 / M=0.7 / L=0.4）</p>
+                  <p style="margin:0">③ 柱状图中红色(&lt;60%)表示未达标</p>
+                </div>
+              </template>
+              <el-icon style="margin-left:6px;cursor:help;color:#909399;vertical-align:middle"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </template>
           <div ref="barChartRef" style="height: 300px;"></div>
         </el-card>
       </el-col>
       <el-col :span="12">
         <el-card shadow="never">
-          <template #header>毕业要求达成度雷达图</template>
+          <template #header>
+            <span>毕业要求达成度雷达图</span>
+            <el-tooltip placement="bottom" effect="dark" raw-content>
+              <template #content>
+                <div style="max-width:360px;line-height:1.8">
+                  <p style="margin:0 0 8px;font-weight:bold">计算说明：</p>
+                  <p style="margin:0 0 4px">① 六个维度分别对应毕业要求 GR1~GR6：<br/>工程知识、问题分析、设计/开发解决方案、研究、使用现代工具、个人和团队</p>
+                  <p style="margin:0 0 4px">② 毕业要求达成度 = 其下所有指标点达成度的最小值</p>
+                  <p style="margin:0">③ 维度值 = 该维度下所有毕业要求达成度的平均值 × 100</p>
+                </div>
+              </template>
+              <el-icon style="margin-left:6px;cursor:help;color:#909399;vertical-align:middle"><QuestionFilled /></el-icon>
+            </el-tooltip>
+          </template>
           <div ref="radarChartRef" style="height: 300px;"></div>
         </el-card>
       </el-col>
@@ -68,7 +94,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, QuestionFilled } from '@element-plus/icons-vue'
 import request from '@/api/request'
 
 // ============ 状态 ============
