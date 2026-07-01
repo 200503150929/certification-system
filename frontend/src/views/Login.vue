@@ -46,10 +46,10 @@
 
           <!-- 锁定提示 -->
           <el-alert
-              v-if="isLocked"
-              title="账号已锁定"
+              v-if="lockStatus.isLocked"
+              title="IP 已被锁定"
               type="warning"
-              description="检测到异常登录尝试，请15分钟后重试。"
+              :description="`检测到异常登录尝试，请 ${lockStatus.remainingMinutes} 分钟后重试。`"
               show-icon
               :closable="false"
               style="margin-bottom: 16px"
@@ -67,21 +67,21 @@
               style="width:100%;"
               size="large"
               :loading="loading"
-              :disabled="isLocked"
+              :disabled="lockStatus.isLocked"
               @click="handleLogin"
           >
             登录系统
           </el-button>
 
-          <!-- 登录失败次数提示 -->
-          <div v-if="loginAttempts > 0 && !isLocked" class="attempts-container">
+          <!-- 登录失败次数提示（从后端获取） -->
+          <div v-if="lockStatus.attemptCount > 0 && !lockStatus.isLocked" class="attempts-container">
             <div class="attempts-header">
               <span class="attempts-label">
                 <el-icon><Warning /></el-icon>
                 登录尝试
               </span>
               <span class="attempts-count" :style="{ color: attemptsColor }">
-                {{ loginAttempts }} / {{ MAX_ATTEMPTS }}
+                {{ lockStatus.attemptCount }} / {{ MAX_ATTEMPTS }}
               </span>
             </div>
             <el-progress
@@ -107,14 +107,14 @@
           <ul>
             <li>
               <el-icon color="green"><SuccessFilled /></el-icon>
-              登录限制：连续5次失败后账号将被锁定15分钟。
+              登录限制：连续5次失败后该 IP 将被锁定15分钟。
             </li>
           </ul>
           <el-alert
-              v-if="isLocked"
-              title="账号已锁定"
+              v-if="lockStatus.isLocked"
+              title="IP 已被锁定"
               type="warning"
-              description="检测到异常登录尝试，请15分钟后重试。"
+              :description="`检测到异常登录尝试，请 ${lockStatus.remainingMinutes} 分钟后重试。`"
               show-icon
               :closable="false"
           />
@@ -148,10 +148,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import request from '@/api/request'
 import {
   School,
   WarningFilled,
@@ -191,53 +192,22 @@ const validCount = computed(() => {
   return count
 })
 
-// 密码有效条件（只需满足3项）
-const isPasswordValid = computed(() => {
-  return validateLength.value && validateNumber.value && validateLetter.value
-})
 
-// 密码强度百分比（基础3项 + 特殊字符额外加分）
-const strengthPercentage = computed(() => {
-  let base = Math.round((validCount.value / 3) * 100)
-  if (validateSpecialChar.value) {
-    base = Math.min(base + 10, 100)
-  }
-  if (loginForm.value.password.length === 0) return 0
-  return base
-})
 
-// 密码强度文字
-const strengthText = computed(() => {
-  const pct = strengthPercentage.value
-  if (pct === 0) return '请设置密码'
-  if (pct <= 33) return '弱'
-  if (pct <= 66) return '一般'
-  if (pct <= 90) return '强'
-  return '非常强'
-})
-
-// 密码强度颜色
-const strengthColor = computed(() => {
-  const pct = strengthPercentage.value
-  if (pct === 0) return '#c0c4cc'
-  if (pct <= 33) return '#f56c6c'
-  if (pct <= 66) return '#e6a23c'
-  if (pct <= 90) return '#409eff'
-  return '#67c23a'
-})
-
-// ============ 登录锁定策略 ============
+// ============ 登录锁定策略（从后端获取） ============
 const MAX_ATTEMPTS = 5
 const LOCK_DURATION = 15
 
-const loginAttempts = ref(0)
-const lockUntil = ref(null)
-const isLocked = ref(false)
-const remainingLockTime = ref(0)
-let lockTimer = null
+// 锁定状态（从后端获取）
+const lockStatus = ref({
+  isLocked: false,
+  attemptCount: 0,
+  remainingMinutes: 0
+})
 
+// 计算进度百分比
 const attemptsPercentage = computed(() => {
-  return Math.round((loginAttempts.value / MAX_ATTEMPTS) * 100)
+  return Math.round((lockStatus.value.attemptCount / MAX_ATTEMPTS) * 100)
 })
 
 const attemptsProgressColor = computed(() => {
@@ -254,100 +224,23 @@ const attemptsColor = computed(() => {
   return '#f56c6c'
 })
 
-const loadLockState = () => {
-  const savedAttempts = localStorage.getItem('loginAttempts')
-  const savedLockUntil = localStorage.getItem('lockUntil')
-
-  if (savedAttempts) {
-    loginAttempts.value = parseInt(savedAttempts)
-  }
-
-  if (savedLockUntil) {
-    lockUntil.value = new Date(parseInt(savedLockUntil))
-    checkLockStatus()
-  }
-}
-
-const checkLockStatus = () => {
-  if (!lockUntil.value) {
-    isLocked.value = false
-    return
-  }
-
-  const now = new Date()
-  if (now < lockUntil.value) {
-    isLocked.value = true
-    updateRemainingTime()
-    startLockTimer()
-  } else {
-    isLocked.value = false
-    lockUntil.value = null
-    loginAttempts.value = 0
-    localStorage.removeItem('loginAttempts')
-    localStorage.removeItem('lockUntil')
-    if (lockTimer) {
-      clearInterval(lockTimer)
-      lockTimer = null
+/**
+ * 从后端获取当前 IP 的锁定状态
+ */
+const fetchLockStatus = async () => {
+  try {
+    const res = await request.get('/auth/lock-status')
+    if (res.status === 'success' && res.data) {
+      lockStatus.value = {
+        isLocked: res.data.isLocked || false,
+        attemptCount: res.data.attemptCount || 0,
+        remainingMinutes: res.data.remainingMinutes || 0
+      }
+      console.log('锁定状态已更新:', lockStatus.value)
     }
-  }
-}
-
-const updateRemainingTime = () => {
-  if (!lockUntil.value) return
-  const now = new Date()
-  const diffMs = lockUntil.value - now
-  if (diffMs <= 0) {
-    remainingLockTime.value = 0
-    isLocked.value = false
-    loginAttempts.value = 0
-    localStorage.removeItem('loginAttempts')
-    localStorage.removeItem('lockUntil')
-    if (lockTimer) {
-      clearInterval(lockTimer)
-      lockTimer = null
-    }
-    return
-  }
-  remainingLockTime.value = Math.ceil(diffMs / (1000 * 60))
-}
-
-const startLockTimer = () => {
-  if (lockTimer) {
-    clearInterval(lockTimer)
-  }
-  lockTimer = setInterval(() => {
-    updateRemainingTime()
-    if (!isLocked.value) {
-      clearInterval(lockTimer)
-      lockTimer = null
-    }
-  }, 10000)
-}
-
-const recordFailedAttempt = () => {
-  loginAttempts.value += 1
-  localStorage.setItem('loginAttempts', loginAttempts.value.toString())
-
-  if (loginAttempts.value >= MAX_ATTEMPTS) {
-    const now = new Date()
-    lockUntil.value = new Date(now.getTime() + LOCK_DURATION * 60 * 1000)
-    localStorage.setItem('lockUntil', lockUntil.value.getTime().toString())
-    isLocked.value = true
-    updateRemainingTime()
-    startLockTimer()
-    ElMessage.warning(`连续失败${MAX_ATTEMPTS}次，账号已被锁定${LOCK_DURATION}分钟`)
-  }
-}
-
-const resetLoginAttempts = () => {
-  loginAttempts.value = 0
-  isLocked.value = false
-  lockUntil.value = null
-  localStorage.removeItem('loginAttempts')
-  localStorage.removeItem('lockUntil')
-  if (lockTimer) {
-    clearInterval(lockTimer)
-    lockTimer = null
+  } catch (error) {
+    console.error('获取锁定状态失败:', error)
+    // 失败时使用默认值，不影响登录
   }
 }
 
@@ -383,9 +276,12 @@ const handlePasswordBlur = () => {
 }
 
 // ============ 登录方法 ============
-const handleLogin = () => {
-  if (isLocked.value) {
-    ElMessage.warning(`账号已被锁定，请 ${remainingLockTime.value} 分钟后重试`)
+const handleLogin = async () => {
+  // 先获取最新的锁定状态
+  await fetchLockStatus()
+
+  if (lockStatus.value.isLocked) {
+    ElMessage.warning(`IP 已被锁定，请 ${lockStatus.value.remainingMinutes} 分钟后重试`)
     return
   }
 
@@ -395,17 +291,13 @@ const handleLogin = () => {
     loading.value = true
 
     try {
-      // ========== ✅ 修复1：传递两个独立参数 ==========
       const result = await authStore.login(
           loginForm.value.username,
           loginForm.value.password
       )
 
-      // ========== ✅ 修复2：检查 result.success ==========
       if (result.success) {
         // 登录成功
-        resetLoginAttempts()
-
         if (rememberMe.value) {
           localStorage.setItem('rememberMe', 'true')
           localStorage.setItem('savedUsername', loginForm.value.username)
@@ -414,7 +306,6 @@ const handleLogin = () => {
           localStorage.removeItem('savedUsername')
         }
 
-        // ========== ✅ 修复3：从 authStore 获取用户信息 ==========
         const userName = authStore.userInfo?.name ||
             authStore.userInfo?.username ||
             loginForm.value.username
@@ -424,13 +315,13 @@ const handleLogin = () => {
         const homePath = authStore.getHomePath()
         router.push(homePath)
       } else {
-        // ========== ✅ 修复4：登录失败处理 ==========
-        recordFailedAttempt()
+        // 登录失败，重新获取锁定状态（后端已记录失败次数）
+        await fetchLockStatus()
         ElMessage.error(result.message || '登录失败，请重试')
       }
     } catch (error) {
-      // ========== ✅ 修复5：捕获异常 ==========
-      recordFailedAttempt()
+      // 登录异常，重新获取锁定状态
+      await fetchLockStatus()
       const errorMsg = error?.message || '登录失败，请检查网络连接'
       ElMessage.error(errorMsg)
       console.error('登录异常:', error)
@@ -454,17 +345,10 @@ const loadRemembered = () => {
 // ============ 生命周期 ============
 onMounted(() => {
   loadRemembered()
-  loadLockState()
-  if (isLocked.value) {
-    startLockTimer()
-  }
-})
-
-onUnmounted(() => {
-  if (lockTimer) {
-    clearInterval(lockTimer)
-    lockTimer = null
-  }
+  // 页面加载时获取锁定状态
+  fetchLockStatus()
+  // 每 30 秒刷新一次锁定状态（可选）
+  // setInterval(fetchLockStatus, 30000)
 })
 </script>
 
