@@ -7,7 +7,7 @@
           <div>
             <el-input
                 v-model="searchUsername"
-                placeholder="搜索工号"
+                placeholder="搜索工号/学号"
                 class="search-input"
                 clearable
                 @keyup.enter="handleSearch"
@@ -35,7 +35,7 @@
       </template>
 
       <el-table :data="tableData" style="width: 100%" v-loading="loading" border>
-        <el-table-column prop="username" label="工号" width="120"></el-table-column>
+        <el-table-column prop="username" label="工号/学号" width="120"></el-table-column>
         <el-table-column prop="name" label="姓名" width="100"></el-table-column>
         <el-table-column prop="role" label="角色" width="100">
           <template #default="scope">

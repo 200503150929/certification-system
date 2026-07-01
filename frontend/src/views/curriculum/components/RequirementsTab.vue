@@ -65,7 +65,12 @@
             <el-table-column prop="description" label="描述" min-width="200" />
             <el-table-column prop="weight" label="权重" width="100">
               <template #default="scope">
-                {{ scope.row.weight }}%
+                {{ formatWeight(scope.row.weight) }}%
+              </template>
+            </el-table-column>
+            <el-table-column prop="passScore" label="合格标准" width="120">
+              <template #default="scope">
+                {{ formatPassScore(scope.row.passScore) }}分
               </template>
             </el-table-column>
             <el-table-column label="操作" width="120">
@@ -224,6 +229,44 @@ const indicatorFormRules = {
   passScore: [{ required: true, message: '请输入合格标准', trigger: 'blur' }]
 }
 
+// ==================== 单位换算工具函数 ====================
+
+/**
+ * 后端权重（小数）→ 前端显示（百分比）
+ * 0.1 → 10
+ */
+const formatWeight = (backendWeight) => {
+  if (backendWeight === null || backendWeight === undefined) return 0
+  return Math.round(Number(backendWeight) * 100)
+}
+
+/**
+ * 后端合格标准（小数）→ 前端显示（分数）
+ * 0.6 → 60
+ */
+const formatPassScore = (backendPassScore) => {
+  if (backendPassScore === null || backendPassScore === undefined) return 0
+  return Math.round(Number(backendPassScore) * 100)
+}
+
+/**
+ * 前端权重（百分比）→ 后端存储（小数）
+ * 10 → 0.1
+ */
+const toBackendWeight = (frontendWeight) => {
+  return Number(frontendWeight) / 100
+}
+
+/**
+ * 前端合格标准（分数）→ 后端存储（小数）
+ * 60 → 0.6
+ */
+const toBackendPassScore = (frontendPassScore) => {
+  return Number(frontendPassScore) / 100
+}
+
+// ==================== 数据加载 ====================
+
 // 加载毕业要求列表
 const loadRequirements = async () => {
   if (!props.programId) return
@@ -252,11 +295,12 @@ const loadIndicators = async (requirementId) => {
   }
 }
 
+// ==================== 指标点管理 ====================
+
 // 展开管理指标点
 const manageIndicators = (item) => {
   expandedRequirementId.value = expandedRequirementId.value === item.id ? null : item.id
 }
-
 
 // 新增指标点
 const addIndicator = (requirementId) => {
@@ -269,13 +313,14 @@ const addIndicator = (requirementId) => {
   const req = requirementList.value.find(r => r.id === requirementId)
   const prefix = req ? req.code : ''
   const count = (indicatorMap.value[requirementId]?.length || 0) + 1
-  indicatorFormData.code = `${prefix}.${count}`  // 生成 "1.1", "1.2", "2.1" 等
+  indicatorFormData.code = `${prefix}.${count}`
 
   indicatorFormData.description = ''
   indicatorFormData.weight = 10
   indicatorFormData.passScore = 60
   indicatorDialogVisible.value = true
 }
+
 // 编辑指标点
 const editIndicator = (row) => {
   if (props.disabled) return
@@ -285,8 +330,9 @@ const editIndicator = (row) => {
   currentRequirementId.value = row.requirementId
   indicatorFormData.code = row.code || ''
   indicatorFormData.description = row.description || ''
-  indicatorFormData.weight = Number(row.weight) || 10
-  indicatorFormData.passScore = Number(row.passScore) || 60
+  // 【修复】后端小数 → 前端显示值（乘以100）
+  indicatorFormData.weight = formatWeight(row.weight)
+  indicatorFormData.passScore = formatPassScore(row.passScore)
   indicatorDialogVisible.value = true
 }
 
@@ -317,8 +363,9 @@ const submitIndicatorForm = () => {
         requirementId: Number(currentRequirementId.value),
         code: indicatorFormData.code,
         description: indicatorFormData.description,
-        weight: indicatorFormData.weight,
-        passScore: indicatorFormData.passScore
+        // 【修复】前端显示值 → 后端存储值（除以100）
+        weight: toBackendWeight(indicatorFormData.weight),
+        passScore: toBackendPassScore(indicatorFormData.passScore)
       }
       if (isIndicatorEdit.value) {
         payload.id = indicatorEditId.value
@@ -350,7 +397,8 @@ const resetIndicatorForm = () => {
   indicatorEditId.value = ''
 }
 
-// 毕业要求增删改
+// ==================== 毕业要求管理 ====================
+
 const handleAdd = () => {
   if (props.disabled) return
   dialogTitle.value = '新增毕业要求'
@@ -421,7 +469,8 @@ const resetForm = () => {
   editId.value = ''
 }
 
-// 监听 programId 变化重新加载
+// ==================== 生命周期 ====================
+
 watch(() => props.programId, () => {
   loadRequirements()
 })
