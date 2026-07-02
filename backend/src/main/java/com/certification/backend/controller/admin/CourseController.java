@@ -90,8 +90,12 @@ public class CourseController {
     @Operation(summary = "导出课程体系及矩阵", description = "导出课程基本信息及支撑矩阵（Excel格式）")
     @PreAuthorize("hasAuthority('course:manage')")
     @GetMapping("/export")
-    public void export(HttpServletResponse response) throws IOException {
-        List<CourseResponse> courses = courseService.listForExport();
+    public void export(
+            @RequestParam(required = false) Long programId,
+            HttpServletResponse response) throws IOException {
+
+        // 根据 programId 过滤导出
+        List<CourseResponse> courses = courseService.listForExport(programId);
 
         response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         response.setCharacterEncoding("utf-8");

@@ -299,7 +299,7 @@ const handleExport = async () => {
   exporting.value = true
   try {
     const token = localStorage.getItem('token')
-    const url = `/api/admin/course/export`
+    const url = `/api/admin/course/export?programId=${props.programId}`
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })

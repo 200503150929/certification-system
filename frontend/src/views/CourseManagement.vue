@@ -57,12 +57,12 @@
 
           <div class="pagination-container">
             <el-pagination
-              background
-              layout="total, prev, pager, next"
-              :total="total"
-              :page-size="pageSize"
-              :current-page="pageNum"
-              @current-change="handlePageChange"
+                background
+                layout="total, prev, pager, next"
+                :total="total"
+                :page-size="pageSize"
+                :current-page="pageNum"
+                @current-change="handlePageChange"
             ></el-pagination>
           </div>
         </el-tab-pane>
@@ -72,10 +72,10 @@
             <el-table :data="matrixCourseList" border style="width: 100%">
               <el-table-column prop="name" label="课程 / 毕业要求" width="220" fixed />
               <el-table-column
-                v-for="req in graduationRequirements"
-                :key="req.id"
-                :label="req.code"
-                width="140"
+                  v-for="req in graduationRequirements"
+                  :key="req.id"
+                  :label="req.code"
+                  width="140"
               >
                 <template #default="scope">
                   <el-select v-model="scope.row.supports[req.id]" placeholder="无" size="small">
@@ -106,10 +106,10 @@
 
     <!-- 新增/编辑课程弹窗 -->
     <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="520px"
-      @close="resetForm"
+        v-model="dialogVisible"
+        :title="dialogTitle"
+        width="520px"
+        @close="resetForm"
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-form-item label="课程代码" prop="code">
@@ -171,7 +171,8 @@ const exporting = ref(false)
 
 // ============ 专业信息 ============
 const programName = ref('')
-const programId = computed(() => route.params.programId)
+// 直接使用 ref 存储 programId，而不是 computed
+const programId = ref(null)
 
 // ============ 课程列表 ============
 const courseList = ref([])
@@ -234,6 +235,10 @@ const fetchProgramInfo = async () => {
 
 // ============ 加载课程列表 ============
 const fetchCourses = async () => {
+  if (!programId.value) {
+    console.warn('programId 为空，无法加载课程列表')
+    return
+  }
   loading.value = true
   try {
     const res = await request.get('/admin/course/list', {
@@ -343,6 +348,10 @@ const resetForm = () => {
 
 // ============ 支撑矩阵 ============
 const fetchMatrixData = async () => {
+  if (!programId.value) {
+    console.warn('programId 为空，无法加载矩阵数据')
+    return
+  }
   matrixLoading.value = true
   try {
     // 加载毕业要求（含指标点）
@@ -424,45 +433,81 @@ const handleTabChange = (tab) => {
 
 // ============ 导出 ============
 const handleExport = async () => {
+  // 检查 programId 是否存在
+  if (!programId.value) {
+    ElMessage.warning('未找到当前培养方案ID，请刷新页面后重试')
+    return
+  }
+
   exporting.value = true
   try {
     const token = localStorage.getItem('token')
-    const url = `/api/admin/course/export`
-    const a = document.createElement('a')
-    a.href = url
-    a.download = ''
-    // 通过 fetch + blob 方式下载以携带 Authorization
+    // 传递 programId 参数，只导出当前培养方案的课程
+    const url = `/api/admin/course/export?programId=${programId.value}`
+    console.log('导出 URL:', url)
+
     const response = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('导出失败:', errorText)
+      throw new Error('导出失败')
+    }
+
     const blob = await response.blob()
     const blobUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = blobUrl
-    link.download = '课程体系数据.xlsx'
+    link.download = `${programName.value || '课程体系'}_课程数据.xlsx`
     link.click()
     window.URL.revokeObjectURL(blobUrl)
     ElMessage.success('导出成功')
   } catch (e) {
-    ElMessage.error('导出失败')
+    console.error('导出异常:', e)
+    ElMessage.error('导出失败: ' + (e.message || '未知错误'))
   } finally {
     exporting.value = false
   }
 }
 
+// ============ 从路由参数初始化 programId ============
+const initFromRoute = () => {
+  const id = route.params.programId
+  console.log('初始化 programId from route:', id)
+  if (id) {
+    const numId = Number(id)
+    if (!isNaN(numId)) {
+      programId.value = numId
+      return true
+    }
+  }
+  return false
+}
+
 // ============ 监听路由 ============
 watch(() => route.params.programId, (newVal) => {
+  console.log('路由 programId 变化:', newVal)
   if (newVal) {
-    fetchProgramInfo()
-    fetchCourses()
-    matrixCourseList.value = []
+    const numId = Number(newVal)
+    if (!isNaN(numId)) {
+      programId.value = numId
+      fetchProgramInfo()
+      fetchCourses()
+      matrixCourseList.value = []
+    }
   }
 }, { immediate: true })
 
+// ============ 组件挂载 ============
 onMounted(() => {
-  if (programId.value) {
+  const success = initFromRoute()
+  if (success) {
     fetchProgramInfo()
     fetchCourses()
+  } else {
+    console.warn('未从路由获取到有效的 programId')
   }
 })
 </script>

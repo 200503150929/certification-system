@@ -342,8 +342,8 @@ const downloadTemplate = () => {
   try {
     const data = [
       ['用户名', '姓名', '角色', '电话', '邮箱', '学院', '专业'],
-      ['202401001', '张三', 'student', '13800001001', 'zhangsan@example.com', '计算机学院', '计算机科学与技术'],
-      ['202401002', '李四', 'student', '13800001002', 'lisi@example.com', '计算机学院', '软件工程'],
+      ['20241001', '张三', 'student', '13800001001', 'zhangsan@example.com', '计算机学院', '计算机科学与技术'],
+      ['20241002', '李四', 'student', '13800001002', 'lisi@example.com', '计算机学院', '软件工程'],
       ['teacher01', '王老师', 'teacher', '13800001003', 'wang@example.com', '计算机学院', '计算机科学与技术'],
       ['admin01', '管理员', 'admin', '13800001004', 'admin@example.com', '计算机学院', '计算机科学与技术'],
     ]

@@ -19,6 +19,8 @@ import com.certification.backend.repository.IndicatorPointRepository;
 import com.certification.backend.repository.ProgramRepository;
 import com.certification.backend.service.CourseService;
 import jakarta.persistence.criteria.Predicate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -39,6 +41,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class CourseServiceImpl implements CourseService {
 
+    private static final Logger log = LoggerFactory.getLogger(CourseServiceImpl.class);
+
     private final CourseRepository courseRepository;
     private final CourseRequirementMatrixRepository matrixRepository;
     private final ProgramRepository programRepository;
@@ -48,10 +52,10 @@ public class CourseServiceImpl implements CourseService {
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public CourseServiceImpl(CourseRepository courseRepository,
-                              CourseRequirementMatrixRepository matrixRepository,
-                              ProgramRepository programRepository,
-                              IndicatorPointRepository indicatorPointRepository,
-                              GraduationRequirementRepository graduationRequirementRepository) {
+                             CourseRequirementMatrixRepository matrixRepository,
+                             ProgramRepository programRepository,
+                             IndicatorPointRepository indicatorPointRepository,
+                             GraduationRequirementRepository graduationRequirementRepository) {
         this.courseRepository = courseRepository;
         this.matrixRepository = matrixRepository;
         this.programRepository = programRepository;
@@ -305,8 +309,24 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CourseResponse> listForExport() {
-        return courseRepository.findAll(Sort.by(Sort.Direction.ASC, "code")).stream()
+    public List<CourseResponse> listForExport(Long programId) {
+        log.info("===== 导出课程，接收到的 programId = {} =====", programId);
+
+        List<Course> courses;
+        if (programId != null) {
+            // 使用 Repository 自带方法按培养方案过滤
+            log.info("按培养方案 {} 过滤课程", programId);
+            courses = courseRepository.findByProgramId(programId);
+        } else {
+            // 导出全部
+            log.info("programId 为空，导出全部课程");
+            courses = courseRepository.findAll(Sort.by(Sort.Direction.ASC, "code"));
+        }
+
+        log.info("查询到 {} 条课程", courses.size());
+        courses.forEach(c -> log.info("课程: {}, programId: {}", c.getCode(), c.getProgramId()));
+
+        return courses.stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }

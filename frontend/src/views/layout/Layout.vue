@@ -216,7 +216,7 @@ const getBreadcrumbConfig = (path) => {
     return { items: [{ name: '我的课程', path: '/app/my-courses' }, { name: '课程详情' }] }
   }
   if (path.startsWith('/app/teacher/course/')) {
-    return { items: [{ name: '课程管理', path: '/app/my-courses' }, { name: '课程管理' }] }
+    return { items: [{ name: '我的课程', path: '/app/my-courses' }, { name: '课程管理' }] }
   }
   if (path.includes('/students')) {
     return { items: [{ name: '课程管理', path: '/app/my-courses' }, { name: '学生名单' }] }
