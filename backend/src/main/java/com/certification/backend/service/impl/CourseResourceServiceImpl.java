@@ -9,6 +9,7 @@ import com.certification.backend.enums.ResultCodeEnum;
 import com.certification.backend.exception.BusinessException;
 import com.certification.backend.repository.CourseOfferingRepository;
 import com.certification.backend.repository.CourseResourceRepository;
+import com.certification.backend.repository.StudentCourseRepository;
 import com.certification.backend.repository.UserRepository;
 import com.certification.backend.service.CourseResourceService;
 import org.slf4j.Logger;
@@ -40,6 +41,7 @@ public class CourseResourceServiceImpl implements CourseResourceService {
     private final CourseResourceRepository resourceRepository;
     private final CourseOfferingRepository offeringRepository;
     private final UserRepository userRepository;
+    private final StudentCourseRepository studentCourseRepository;
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -56,11 +58,15 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
     public CourseResourceServiceImpl(CourseResourceRepository resourceRepository,
                                      CourseOfferingRepository offeringRepository,
-                                     UserRepository userRepository) {
+                                     UserRepository userRepository,
+                                     StudentCourseRepository studentCourseRepository) {
         this.resourceRepository = resourceRepository;
         this.offeringRepository = offeringRepository;
         this.userRepository = userRepository;
+        this.studentCourseRepository = studentCourseRepository;
     }
+
+    // ==================== 教师专用方法（仅授课教师） ====================
 
     @Override
     public CourseResourceResponse add(CourseResourceRequest request, String username) {
@@ -77,17 +83,8 @@ public class CourseResourceServiceImpl implements CourseResourceService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public List<CourseResourceResponse> listByOfferingId(Long offeringId, String username) {
-        getOfferingAndValidateOwner(offeringId, username);
-        List<CourseResource> resources = resourceRepository.findByOfferingId(offeringId);
-        return resources.stream().map(this::toResponse).collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional
     public CourseResourceResponse upload(Long offeringId, MultipartFile file, String resourceType, String username) {
-        // 校验开课记录权限
+        // 校验开课记录权限（仅授课教师）
         getOfferingAndValidateOwner(offeringId, username);
 
         // 校验文件是否为空
@@ -138,14 +135,6 @@ public class CourseResourceServiceImpl implements CourseResourceService {
     }
 
     @Override
-    @Transactional(readOnly = true)
-    public CourseResource getById(Long id) {
-        return resourceRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程资源不存在"));
-    }
-
-    @Override
-    @Transactional
     public void delete(Long id, String username) {
         CourseResource resource = resourceRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程资源不存在"));
@@ -167,14 +156,82 @@ public class CourseResourceServiceImpl implements CourseResourceService {
         resourceRepository.deleteById(id);
     }
 
-    // ==================== 私有方法 ====================
+    // ==================== 通用方法（含选课校验） ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CourseResourceResponse> listByOfferingId(Long offeringId, String username) {
+        // 校验用户是否有权查看该开课的资源（授课教师 或 选课学生）
+        checkAccessPermission(offeringId, username);
+
+        List<CourseResource> resources = resourceRepository.findByOfferingId(offeringId);
+        return resources.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CourseResource getByIdWithAccessCheck(Long id, String username) {
+        CourseResource resource = resourceRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程资源不存在"));
+
+        // 校验用户是否有权访问该资源（授课教师 或 选课学生）
+        checkAccessPermission(resource.getOfferingId(), username);
+
+        return resource;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CourseResource getById(Long id) {
+        return resourceRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "课程资源不存在"));
+    }
+
+    // ==================== 权限校验私有方法 ====================
+
+    /**
+     * 校验用户是否有权访问该开课记录的资源
+     * 满足以下任一条件即可：
+     * 1. 该用户是该开课记录的授课教师
+     * 2. 该用户是选修了该课程的学生
+     */
+    private void checkAccessPermission(Long offeringId, String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.UNAUTHORIZED, "用户不存在"));
+
+        CourseOffering offering = offeringRepository.findById(offeringId)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "开课记录不存在"));
+
+        // 1. 检查是否为授课教师
+        if (offering.getTeacherId().equals(user.getId())) {
+            return; // 授课教师有权访问
+        }
+
+        // 2. 检查是否为选课学生（仅学生角色需要检查）
+        if ("student".equals(user.getRole())) {
+            boolean isEnrolled = studentCourseRepository
+                    .existsByOfferingIdAndStudentId(offeringId, user.getId());
+            if (isEnrolled) {
+                return; // 选课学生有权访问
+            }
+        }
+
+        // 3. 既不是授课教师，也不是选课学生 → 拒绝访问
+        throw new BusinessException(ResultCodeEnum.FORBIDDEN, "您未选修该课程，无权查看资源");
+    }
 
     /**
      * 获取开课记录并校验当前用户是否为该记录的授课教师
+     * （仅教师专用方法调用）
      */
     private CourseOffering getOfferingAndValidateOwner(Long offeringId, String username) {
         User teacher = userRepository.findByUsername(username)
                 .orElseThrow(() -> new BusinessException(ResultCodeEnum.UNAUTHORIZED, "用户不存在"));
+
+        // 检查用户角色是否为教师
+        if (!"teacher".equals(teacher.getRole())) {
+            throw new BusinessException(ResultCodeEnum.FORBIDDEN, "仅教师可执行此操作");
+        }
 
         CourseOffering offering = offeringRepository.findById(offeringId)
                 .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "开课记录不存在"));
@@ -185,6 +242,8 @@ public class CourseResourceServiceImpl implements CourseResourceService {
 
         return offering;
     }
+
+    // ==================== 工具方法 ====================
 
     private CourseResourceResponse toResponse(CourseResource resource) {
         CourseResourceResponse resp = new CourseResourceResponse();

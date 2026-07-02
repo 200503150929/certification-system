@@ -16,6 +16,11 @@ public interface CourseObjectiveService {
     List<CourseObjectiveResponse> listByOfferingId(Long offeringId, String username);
 
     /**
+     * 学生端查询课程目标（验证学生选修了该课程）
+     */
+    List<CourseObjectiveResponse> listByOfferingIdForStudent(Long offeringId, String username);
+
+    /**
      * 新增课程目标
      */
     CourseObjectiveResponse add(Long offeringId, CourseObjectiveRequest request, String username);

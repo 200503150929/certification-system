@@ -12,10 +12,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false, length = 12) //工号/学号/管理员账号
+    @Column(unique = true, nullable = false, length = 12)
     private String username;
 
-    @Column(nullable = false, length = 60)
+    @Column(nullable = false, length = 100)
     private String password;
 
     @Column(length = 10)
@@ -31,11 +31,19 @@ public class User {
     private String email;
 
     @Column(length = 50)
-    private String department;//院系
+    private String college;  // 学院
 
-    /**
-     * 状态：1 正常，0 停用
-     */
+    @Column(length = 50)
+    private String major;    // 专业
+
+    // 学生特有字段
+    @Column(length = 20)
+    private String grade;    // 年级，如 2024级
+
+    @Column(name = "class_name", length = 20)
+    private String className;// 班级，如 1班
+
+
     @Column(nullable = false)
     private Integer status = 1;
 

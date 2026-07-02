@@ -18,7 +18,7 @@ import java.util.List;
  */
 @Tag(name = "05-课程目标管理", description = "教师端课程目标的增删改查")
 @RestController
-@PreAuthorize("hasRole('TEACHER')")
+@PreAuthorize("hasAuthority('course:set-goals')")
 public class CourseObjectiveController {
 
     private final CourseObjectiveService courseObjectiveService;

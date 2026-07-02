@@ -21,4 +21,9 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
      * 根据开课ID查询考核环节列表
      */
     List<Assessment> findByOfferingId(Long offeringId);
+
+    /**
+     * 根据开课ID列表批量查询考核环节
+     */
+    List<Assessment> findByOfferingIdIn(List<Long> offeringIds);
 }

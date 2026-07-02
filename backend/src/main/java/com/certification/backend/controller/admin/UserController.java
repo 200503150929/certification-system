@@ -27,7 +27,7 @@ import java.util.List;
 @Tag(name = "02-用户管理", description = "系统用户增删改查、密码重置、Excel 批量导入")
 @RestController
 @RequestMapping("/admin/users")
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAuthority('user:list')")
 public class UserController {
 
     private final UserService userService;
@@ -87,7 +87,7 @@ public class UserController {
 
     @Operation(
             summary = "批量导入用户（Excel）",
-            description = "上传 Excel 文件批量导入用户，文件需包含：用户名、姓名、角色、电话、邮箱、院系"
+            description = "上传 Excel 文件批量导入用户，文件需包含：工号/学号、姓名、角色、电话、邮箱、院系"
     )
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseVO<String> importUsers(

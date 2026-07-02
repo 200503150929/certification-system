@@ -14,6 +14,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 
 /**
  * JWT 工具类：生成 Token、解析 Claims、验证过期时间
@@ -36,21 +37,30 @@ public class JwtUtil {
     /**
      * 生成 JWT Token
      *
-     * @param username 用户名
-     * @param role     用户角色
+     * @param username    用户名
+     * @param role        用户角色
+     * @param permissions 权限标识符列表（可为空）
      * @return JWT token 字符串
      */
-    public String generateToken(String username, String role) {
+    public String generateToken(String username, String role, List<String> permissions) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + expiration);
 
         return Jwts.builder()
                 .subject(username)
                 .claim("role", role)
+                .claim("permissions", String.join(",", permissions != null ? permissions : List.of()))
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(secretKey)
                 .compact();
+    }
+
+    /**
+     * 生成 JWT Token（兼容旧接口，无权限列表）
+     */
+    public String generateToken(String username, String role) {
+        return generateToken(username, role, List.of());
     }
 
     /**
@@ -92,6 +102,17 @@ public class JwtUtil {
     public String getRole(String token) {
         Claims claims = parseClaims(token);
         return claims != null ? claims.get("role", String.class) : null;
+    }
+
+    /**
+     * 从 Token 中提取权限标识符列表
+     */
+    public List<String> getPermissions(String token) {
+        Claims claims = parseClaims(token);
+        if (claims == null) return List.of();
+        String permStr = claims.get("permissions", String.class);
+        if (permStr == null || permStr.isEmpty()) return List.of();
+        return List.of(permStr.split(","));
     }
 
     /**

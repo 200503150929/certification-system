@@ -47,8 +47,11 @@ public class SecurityConfig {
 
                 // 配置放行与拦截规则
                 .authorizeHttpRequests(auth -> auth
-                        // 放行登录接口
-                        .requestMatchers("/auth/login").permitAll()
+                        // 放行认证相关接口
+                        .requestMatchers(
+                                "/auth/login",          // 登录
+                                "/auth/lock-status"     // 锁定状态查询
+                        ).permitAll()
                         // 放行测试接口
                         .requestMatchers("/test/**").permitAll()
                         // 放行上传文件静态资源访问

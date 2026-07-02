@@ -3,23 +3,19 @@ package com.certification.backend.service.impl;
 import com.certification.backend.dto.request.PageQuery;
 import com.certification.backend.dto.request.ProgramRequest;
 import com.certification.backend.dto.response.*;
-import com.certification.backend.entity.EducationalObjective;
-import com.certification.backend.entity.GraduationRequirement;
-import com.certification.backend.entity.IndicatorPoint;
-import com.certification.backend.entity.Program;
+import com.certification.backend.entity.*;
 import com.certification.backend.enums.ResultCodeEnum;
+import com.certification.backend.enums.SupportLevelEnum;
 import com.certification.backend.exception.BusinessException;
 import com.certification.backend.repository.*;
 import com.certification.backend.service.ProgramService;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -36,17 +32,23 @@ public class ProgramServiceImpl implements ProgramService {
     private final GraduationRequirementRepository graduationRequirementRepository;
     private final IndicatorPointRepository indicatorPointRepository;
     private final ObjectiveRequirementMatrixRepository objectiveRequirementMatrixRepository;
+    private final CourseRepository courseRepository;
+    private final CourseRequirementMatrixRepository courseRequirementMatrixRepository;
 
     public ProgramServiceImpl(ProgramRepository programRepository,
-                               EducationalObjectiveRepository educationalObjectiveRepository,
-                               GraduationRequirementRepository graduationRequirementRepository,
-                               IndicatorPointRepository indicatorPointRepository,
-                               ObjectiveRequirementMatrixRepository objectiveRequirementMatrixRepository) {
+                              EducationalObjectiveRepository educationalObjectiveRepository,
+                              GraduationRequirementRepository graduationRequirementRepository,
+                              IndicatorPointRepository indicatorPointRepository,
+                              ObjectiveRequirementMatrixRepository objectiveRequirementMatrixRepository,
+                              CourseRepository courseRepository,
+                              CourseRequirementMatrixRepository courseRequirementMatrixRepository) {
         this.programRepository = programRepository;
         this.educationalObjectiveRepository = educationalObjectiveRepository;
         this.graduationRequirementRepository = graduationRequirementRepository;
         this.indicatorPointRepository = indicatorPointRepository;
         this.objectiveRequirementMatrixRepository = objectiveRequirementMatrixRepository;
+        this.courseRepository = courseRepository;
+        this.courseRequirementMatrixRepository = courseRequirementMatrixRepository;
     }
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -55,7 +57,7 @@ public class ProgramServiceImpl implements ProgramService {
     @Transactional(readOnly = true)
     public PageResult<ProgramResponse> listPrograms(String majorNameFuzzy, String status, PageQuery pageQuery) {
         // 构建分页请求
-        PageRequest pageRequest = PageRequest.of(
+        org.springframework.data.domain.PageRequest pageRequest = org.springframework.data.domain.PageRequest.of(
                 pageQuery.getPageNum() - 1,
                 pageQuery.getPageSize(),
                 Sort.by(Sort.Direction.DESC, "createdAt")
@@ -205,7 +207,7 @@ public class ProgramServiceImpl implements ProgramService {
         }
 
         // 级联删除：先删除依赖数据
-        // 删除支撑矩阵
+        // 删除培养目标-毕业要求支撑矩阵
         List<EducationalObjective> objectives = educationalObjectiveRepository.findByProgramIdOrderBySortOrderAsc(id);
         for (EducationalObjective obj : objectives) {
             objectiveRequirementMatrixRepository.deleteByObjectiveId(obj.getId());
@@ -221,14 +223,110 @@ public class ProgramServiceImpl implements ProgramService {
         }
         graduationRequirementRepository.deleteByProgramId(id);
 
+        // 删除课程及课程-指标点矩阵
+        List<Course> courses = courseRepository.findByProgramId(id);
+        for (Course course : courses) {
+            courseRequirementMatrixRepository.deleteByCourseId(course.getId());
+        }
+        courseRepository.deleteByProgramId(id);
+
         // 最后删除专业
         programRepository.deleteById(id);
+    }
+
+    /**
+     * 发布前校验数据完整性
+     * @param programId 专业ID
+     * @return 错误信息列表，为空表示校验通过
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> validateProgramData(Long programId) {
+        List<String> errors = new ArrayList<>();
+
+        // ============ 1. 检查培养目标 - 至少1个 ============
+        List<EducationalObjective> objectives = educationalObjectiveRepository.findByProgramIdOrderBySortOrderAsc(programId);
+        if (objectives.isEmpty()) {
+            errors.add("请至少配置一个培养目标");
+            return errors; // 如果连目标都没有，后续校验没有意义，直接返回
+        }
+
+        // ============ 2. 检查毕业要求 - 至少1条 ============
+        List<GraduationRequirement> requirements = graduationRequirementRepository.findByProgramId(programId);
+        if (requirements.isEmpty()) {
+            errors.add("请至少配置一条毕业要求");
+            return errors;
+        }
+
+        // ============ 3. 检查指标点 - 每条毕业要求至少1个 ============
+        boolean hasIndicatorError = false;
+        for (GraduationRequirement req : requirements) {
+            List<IndicatorPoint> indicators = indicatorPointRepository.findByRequirementId(req.getId());
+            if (indicators.isEmpty() && !hasIndicatorError) {
+                errors.add("毕业要求 \"" + req.getCode() + "\" 缺少指标点配置");
+                hasIndicatorError = true; // 只报一次，避免重复
+            }
+        }
+
+        // ============ 4. 检查课程体系 - 至少1门 ============
+        long courseCount = courseRepository.countByProgramId(programId);
+        if (courseCount == 0) {
+            errors.add("请至少添加一门课程");
+        }
+
+        // ============ 5. 检查目标-要求矩阵 - 每个目标至少支撑1条毕业要求 ============
+        boolean hasObjectiveMatrixError = false;
+        for (EducationalObjective obj : objectives) {
+            List<ObjectiveRequirementMatrix> matrixItems = objectiveRequirementMatrixRepository.findByObjectiveId(obj.getId());
+            boolean hasValidSupport = matrixItems.stream()
+                    .anyMatch(item -> item.getSupportLevel() != null &&
+                            SupportLevelEnum.isValid(item.getSupportLevel()));
+
+            if (!hasValidSupport && !hasObjectiveMatrixError) {
+                String shortDesc = obj.getDescription();
+                if (shortDesc.length() > 15) {
+                    shortDesc = shortDesc.substring(0, 15) + "...";
+                }
+                errors.add("培养目标 \"" + shortDesc + "\" 未配置任何支撑关系");
+                hasObjectiveMatrixError = true; // 只报一次，避免重复
+            }
+        }
+
+        // ============ 6. 检查课程-要求矩阵 - 每门课程至少支撑1个指标点 ============
+        List<Course> courses = courseRepository.findByProgramId(programId);
+        boolean hasCourseMatrixError = false;
+        for (Course course : courses) {
+            List<CourseRequirementMatrix> matrixItems = courseRequirementMatrixRepository.findByCourseId(course.getId());
+            boolean hasValidSupport = matrixItems.stream()
+                    .anyMatch(item -> item.getSupportLevel() != null &&
+                            SupportLevelEnum.isValid(item.getSupportLevel()));
+
+            if (!hasValidSupport && !hasCourseMatrixError) {
+                errors.add("课程 \"" + course.getName() + "\" 未配置任何指标点支撑关系");
+                hasCourseMatrixError = true; // 只报一次，避免重复
+            }
+        }
+
+        return errors;
     }
 
     @Override
     public void publishProgram(Long id) {
         Program program = programRepository.findById(id)
                 .orElseThrow(() -> new BusinessException(ResultCodeEnum.NOT_FOUND, "专业不存在"));
+
+        // 检查状态
+        if (!"draft".equals(program.getStatus())) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST, "只有草稿状态的方案可以发布");
+        }
+
+        // 数据完整性校验（双重保障，Controller 层已经校验过）
+        List<String> errors = validateProgramData(id);
+        if (!errors.isEmpty()) {
+            throw new BusinessException(ResultCodeEnum.BAD_REQUEST,
+                    "数据不完整，无法发布：" + String.join("；", errors));
+        }
+
         program.setStatus("published");
         programRepository.save(program);
     }

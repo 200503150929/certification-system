@@ -27,10 +27,9 @@ import java.util.List;
  *
  * 涵盖：课程基础信息管理、课程-毕业要求指标点支撑矩阵管理
  */
-@Tag(name = "04-课程体系管理", description = "课程基础信息管理、课程-毕业要求指标点支撑矩阵管理")
+@Tag(name = "04-课程体系管理", description = "课程基础信息管理、课程-毕业要求指标点支撑矩阵管理（管理员可读写，教师/学生仅可查看）")
 @RestController
 @RequestMapping("/admin/course")
-@PreAuthorize("hasRole('ADMIN')")
 public class CourseController {
 
     private final CourseService courseService;
@@ -56,12 +55,14 @@ public class CourseController {
     }
 
     @Operation(summary = "新增课程")
+    @PreAuthorize("hasAuthority('course:manage')")
     @PostMapping("/add")
     public ResponseVO<CourseResponse> add(@Valid @RequestBody CourseRequest request) {
         return ResponseVO.success(courseService.addCourse(request));
     }
 
     @Operation(summary = "编辑课程")
+    @PreAuthorize("hasAuthority('course:manage')")
     @PutMapping("/update")
     public ResponseVO<CourseResponse> update(@Valid @RequestBody CourseRequest request) {
         if (request.getId() == null) {
@@ -71,6 +72,7 @@ public class CourseController {
     }
 
     @Operation(summary = "删除课程")
+    @PreAuthorize("hasAuthority('course:manage')")
     @DeleteMapping("/delete/{id}")
     public ResponseVO<Void> delete(@PathVariable Long id) {
         courseService.deleteCourse(id);
@@ -78,6 +80,7 @@ public class CourseController {
     }
 
     @Operation(summary = "批量保存支撑矩阵", description = "全量替换某课程的毕业要求指标点支撑关系（先删后插）")
+    @PreAuthorize("hasAuthority('course:manage')")
     @PostMapping("/matrix/batch-save")
     public ResponseVO<List<CourseDetailResponse.MatrixItemResponse>> batchSaveMatrix(
             @Valid @RequestBody CourseRequirementMatrixBatchRequest request) {
@@ -85,6 +88,7 @@ public class CourseController {
     }
 
     @Operation(summary = "导出课程体系及矩阵", description = "导出课程基本信息及支撑矩阵（Excel格式）")
+    @PreAuthorize("hasAuthority('course:manage')")
     @GetMapping("/export")
     public void export(HttpServletResponse response) throws IOException {
         List<CourseResponse> courses = courseService.listForExport();

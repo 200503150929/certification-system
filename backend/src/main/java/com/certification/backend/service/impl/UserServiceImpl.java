@@ -1,8 +1,10 @@
 package com.certification.backend.service.impl;
 
+import com.certification.backend.dto.request.UpdateProfileRequest;
 import com.certification.backend.dto.request.UserRequest;
 import com.certification.backend.dto.request.PageQuery;
 import com.certification.backend.dto.response.PageResult;
+import com.certification.backend.dto.response.UserProfileResponse;
 import com.certification.backend.dto.response.UserResponse;
 import com.certification.backend.entity.User;
 import com.certification.backend.enums.ResultCodeEnum;
@@ -93,7 +95,8 @@ public class UserServiceImpl implements UserService {
         user.setRole(request.getRole());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
-        user.setDepartment(request.getDepartment());
+        user.setCollege(request.getCollege());  // 学院
+        user.setMajor(request.getMajor());      // 专业
         user.setStatus(request.getStatus() != null ? request.getStatus() : 1);
 
         userRepository.save(user);
@@ -117,7 +120,8 @@ public class UserServiceImpl implements UserService {
         user.setRole(request.getRole());
         user.setPhone(request.getPhone());
         user.setEmail(request.getEmail());
-        user.setDepartment(request.getDepartment());
+        user.setCollege(request.getCollege());  // 学院
+        user.setMajor(request.getMajor());      // 专业
         if (request.getStatus() != null) {
             user.setStatus(request.getStatus());
         }
@@ -179,6 +183,55 @@ public class UserServiceImpl implements UserService {
         return successCount;
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public UserProfileResponse getProfile(String username) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
+        return toProfileResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserProfileResponse updateProfile(String username, UpdateProfileRequest request) {
+        log.info("更新用户个人信息: username={}, phone={}, email={}",
+                username, request.getPhone(), request.getEmail());
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.USER_NOT_FOUND));
+
+        // 更新字段
+        if (request.getPhone() != null && !request.getPhone().isEmpty()) {
+            user.setPhone(request.getPhone());
+        }
+        if (request.getEmail() != null && !request.getEmail().isEmpty()) {
+            user.setEmail(request.getEmail());
+        }
+
+        User updatedUser = userRepository.save(user);
+        log.info("用户个人信息更新成功: id={}, username={}", updatedUser.getId(), updatedUser.getUsername());
+
+        return toProfileResponse(updatedUser);
+    }
+
+    /**
+     * User Entity -> UserProfileResponse VO
+     */
+    private UserProfileResponse toProfileResponse(User user) {
+        UserProfileResponse resp = new UserProfileResponse();
+        resp.setId(user.getId());
+        resp.setUsername(user.getUsername());
+        resp.setName(user.getName());
+        resp.setRole(user.getRole());
+        resp.setPhone(user.getPhone());
+        resp.setEmail(user.getEmail());
+        resp.setCollege(user.getCollege());  // 学院
+        resp.setMajor(user.getMajor());      // 专业
+        resp.setGrade(user.getGrade());      // 年级（学生）
+        resp.setClassName(user.getClassName()); // 班级（学生）
+        return resp;
+    }
+
     /**
      * User Entity -> UserResponse VO
      */
@@ -190,7 +243,8 @@ public class UserServiceImpl implements UserService {
         resp.setRole(user.getRole());
         resp.setPhone(user.getPhone());
         resp.setEmail(user.getEmail());
-        resp.setDepartment(user.getDepartment());
+        resp.setCollege(user.getCollege());  // 学院
+        resp.setMajor(user.getMajor());      // 专业
         resp.setStatus(user.getStatus());
         resp.setCreatedAt(user.getCreatedAt() != null ? user.getCreatedAt().format(DTF) : null);
         return resp;

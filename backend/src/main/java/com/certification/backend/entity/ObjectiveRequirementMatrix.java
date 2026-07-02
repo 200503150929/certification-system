@@ -18,5 +18,5 @@ public class ObjectiveRequirementMatrix {
     private Long requirementId;
 
     @Column(name = "support_level", length = 10)
-    private String supportLevel; // 强/弱
+    private String supportLevel; // H/M/N
 }

@@ -1,6 +1,7 @@
 package com.certification.backend.service;
 
 import com.certification.backend.dto.request.MatrixItemRequest;
+import com.certification.backend.dto.response.IndicatorInfoResponse;
 import com.certification.backend.dto.response.MatrixItemResponse;
 
 import java.util.List;
@@ -19,4 +20,9 @@ public interface ObjectiveIndicatorMatrixService {
      * 批量保存/更新支撑矩阵（全量替换模式）
      */
     List<MatrixItemResponse> batchSaveMatrix(Long offeringId, List<MatrixItemRequest> items, String username);
+
+    /**
+     * 获取开课所属专业的所有指标点（含毕业要求信息）
+     */
+    List<IndicatorInfoResponse> getIndicatorsByOffering(Long offeringId, String username);
 }

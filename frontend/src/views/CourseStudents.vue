@@ -1,0 +1,105 @@
+<template>
+  <div class="course-students-container" v-loading="loading">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>
+            <el-breadcrumb separator="/">
+              <el-breadcrumb-item>课程管理</el-breadcrumb-item>
+              <el-breadcrumb-item>{{ courseName }}</el-breadcrumb-item>
+              <el-breadcrumb-item>学生名单</el-breadcrumb-item>
+            </el-breadcrumb>
+          </span>
+          <span class="student-count">共 {{ students.length }} 名学生</span>
+        </div>
+      </template>
+
+      <div class="search-bar">
+        <el-input v-model="keyword" placeholder="搜索姓名/学号" style="width: 300px" clearable />
+      </div>
+
+      <el-table :data="filteredStudents" border style="width: 100%">
+        <el-table-column prop="studentNo" label="学号" width="120" />
+        <el-table-column prop="studentName" label="姓名" width="120" />
+        <el-table-column label="最终成绩" width="120" align="center">
+          <template #default="scope">
+            <span v-if="scope.row.totalScore != null" style="font-weight: 600">{{ scope.row.totalScore }}</span>
+            <span v-else style="color: #999">未录入</span>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination">
+        <el-pagination
+          background
+          layout="prev, pager, next"
+          :total="filteredStudents.length"
+          :page-size="10"
+        />
+      </div>
+    </el-card>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import request from '@/api/request'
+
+const route = useRoute()
+const offeringId = route.params.id
+
+const loading = ref(false)
+const courseName = ref('加载中...')
+const keyword = ref('')
+const students = ref([])
+
+const filteredStudents = computed(() => {
+  if (!keyword.value) return students.value
+  const k = keyword.value.toLowerCase()
+  return students.value.filter(s =>
+    String(s.studentNo).includes(k) || (s.studentName && s.studentName.toLowerCase().includes(k))
+  )
+})
+
+const loadData = async () => {
+  loading.value = true
+  try {
+    // 加载开课信息
+    const offeringRes = await request.get(`/teacher/offering/detail/${offeringId}`)
+    if (offeringRes.status === 'success' && offeringRes.data) {
+      courseName.value = offeringRes.data.courseName || '未知课程'
+    }
+
+    // 加载学生成绩（新 API：四列固定成绩，只显示最终成绩）
+    const gradesRes = await request.get(`/teacher/student-grades/offering/${offeringId}`)
+    if (gradesRes.status === 'success' && gradesRes.data) {
+      students.value = gradesRes.data
+    }
+  } catch (e) {
+    students.value = []
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadData()
+})
+</script>
+
+<style scoped>
+.course-students-container { padding: 20px; }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.student-count { color: #666; font-size: 14px; }
+.search-bar { margin-bottom: 16px; }
+.pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+</style>

@@ -4,12 +4,14 @@ import com.certification.backend.dto.request.CourseObjectiveRequest;
 import com.certification.backend.dto.response.CourseObjectiveResponse;
 import com.certification.backend.entity.CourseObjective;
 import com.certification.backend.entity.CourseOffering;
+import com.certification.backend.entity.StudentCourse;
 import com.certification.backend.entity.User;
 import com.certification.backend.enums.ResultCodeEnum;
 import com.certification.backend.exception.BusinessException;
 import com.certification.backend.repository.AssessmentRepository;
 import com.certification.backend.repository.CourseObjectiveRepository;
 import com.certification.backend.repository.CourseOfferingRepository;
+import com.certification.backend.repository.StudentCourseRepository;
 import com.certification.backend.repository.UserRepository;
 import com.certification.backend.service.CourseObjectiveService;
 import org.springframework.stereotype.Service;
@@ -30,17 +32,20 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
     private final CourseOfferingRepository offeringRepository;
     private final UserRepository userRepository;
     private final AssessmentRepository assessmentRepository;
+    private final StudentCourseRepository studentCourseRepository;
 
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     public CourseObjectiveServiceImpl(CourseObjectiveRepository objectiveRepository,
                                       CourseOfferingRepository offeringRepository,
                                       UserRepository userRepository,
-                                      AssessmentRepository assessmentRepository) {
+                                      AssessmentRepository assessmentRepository,
+                                      StudentCourseRepository studentCourseRepository) {
         this.objectiveRepository = objectiveRepository;
         this.offeringRepository = offeringRepository;
         this.userRepository = userRepository;
         this.assessmentRepository = assessmentRepository;
+        this.studentCourseRepository = studentCourseRepository;
     }
 
     @Override
@@ -52,11 +57,28 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public List<CourseObjectiveResponse> listByOfferingIdForStudent(Long offeringId, String username) {
+        // 验证学生存在且已选修该课程
+        User student = userRepository.findByUsername(username)
+                .orElseThrow(() -> new BusinessException(ResultCodeEnum.UNAUTHORIZED, "用户不存在"));
+        List<StudentCourse> enrollments = studentCourseRepository.findByOfferingId(offeringId);
+        boolean enrolled = enrollments.stream().anyMatch(sc -> sc.getStudentId().equals(student.getId()));
+        if (!enrolled) {
+            throw new BusinessException(ResultCodeEnum.FORBIDDEN, "未选修该课程");
+        }
+        List<CourseObjective> objectives = objectiveRepository.findByOfferingId(offeringId);
+        return objectives.stream().map(this::toResponse).collect(Collectors.toList());
+    }
+
+    @Override
     public CourseObjectiveResponse add(Long offeringId, CourseObjectiveRequest request, String username) {
         CourseOffering offering = getOfferingAndValidateOwner(offeringId, username);
 
         CourseObjective objective = new CourseObjective();
         objective.setOfferingId(offeringId);
+        // 自动生成编号（如未提供）：查找该开课下已有目标数，生成 CO1, CO2, ...
+        objective.setCode(generateCode(offeringId, request.getCode()));
         objective.setDescription(request.getDescription());
         objective.setWeight(request.getWeight());
 
@@ -72,6 +94,9 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
         // 校验该目标所属的开课记录是否属于当前教师
         getOfferingAndValidateOwner(objective.getOfferingId(), username);
 
+        if (request.getCode() != null) {
+            objective.setCode(request.getCode());
+        }
         if (request.getDescription() != null) {
             objective.setDescription(request.getDescription());
         }
@@ -103,6 +128,28 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
     // ==================== 私有方法 ====================
 
     /**
+     * 自动生成课程目标编号（如 CO1, CO2, ...）
+     * 如果用户已提供编号则直接使用，否则在该开课下自动递增
+     */
+    private String generateCode(Long offeringId, String providedCode) {
+        if (providedCode != null && !providedCode.isBlank()) {
+            return providedCode.trim();
+        }
+        List<CourseObjective> existing = objectiveRepository.findByOfferingId(offeringId);
+        int maxNum = 0;
+        for (CourseObjective obj : existing) {
+            String code = obj.getCode();
+            if (code != null && code.startsWith("CO")) {
+                try {
+                    int num = Integer.parseInt(code.substring(2));
+                    if (num > maxNum) maxNum = num;
+                } catch (NumberFormatException ignored) { }
+            }
+        }
+        return "CO" + (maxNum + 1);
+    }
+
+    /**
      * 获取开课记录并校验当前用户是否为该记录的授课教师
      */
     private CourseOffering getOfferingAndValidateOwner(Long offeringId, String username) {
@@ -123,6 +170,7 @@ public class CourseObjectiveServiceImpl implements CourseObjectiveService {
         CourseObjectiveResponse resp = new CourseObjectiveResponse();
         resp.setId(objective.getId());
         resp.setOfferingId(objective.getOfferingId());
+        resp.setCode(objective.getCode());
         resp.setDescription(objective.getDescription());
         resp.setWeight(objective.getWeight());
         resp.setCreatedAt(objective.getCreatedAt() != null ? objective.getCreatedAt().format(DTF) : null);

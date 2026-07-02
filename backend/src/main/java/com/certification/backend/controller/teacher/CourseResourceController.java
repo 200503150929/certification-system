@@ -24,12 +24,15 @@ import java.nio.file.Paths;
 import java.util.List;
 
 /**
- * 课程资源管理控制器（教师权限）
+ * 课程资源管理控制器
+ *
+ * 权限说明：
+ * - 上传/删除：仅授课教师可操作
+ * - 查询列表/下载：已登录用户 + 必须是该课程的选课学生
  */
-@Tag(name = "07-课程资源管理", description = "教师端课程资源的增删查")
+@Tag(name = "07-课程资源管理", description = "课程资源的增删查（教师上传，选课学生查看下载）")
 @RestController
 @RequestMapping("/teacher/resources")
-@PreAuthorize("hasRole('TEACHER')")
 public class CourseResourceController {
 
     private final CourseResourceService courseResourceService;
@@ -38,8 +41,11 @@ public class CourseResourceController {
         this.courseResourceService = courseResourceService;
     }
 
+    // ==================== 教师专用接口（需 TEACHER 角色） ====================
+
     @Operation(summary = "新增课程资源（手动填写资源信息）")
     @PostMapping
+    @PreAuthorize("hasAuthority('course:upload-resource')")
     public ResponseVO<CourseResourceResponse> add(@Valid @RequestBody CourseResourceRequest request) {
         String username = getCurrentUsername();
         return ResponseVO.success(courseResourceService.add(request, username));
@@ -48,20 +54,45 @@ public class CourseResourceController {
     @Operation(summary = "上传课程资源文件",
             description = "上传文件至服务器，仅允许 PDF/PPT/PPTX/DOC/DOCX/XLS/XLSX，最大 50MB")
     @PostMapping("/upload/{offeringId}")
+    @PreAuthorize("hasAuthority('course:upload-resource')")
     public ResponseVO<CourseResourceResponse> upload(
             @PathVariable Long offeringId,
             @RequestParam("file") MultipartFile file,
-            @RequestParam(value = "resourceType", required = false) String resourceType) {
+            @RequestParam("resourceType") String resourceType) {  // ✅ 改为必填
         String username = getCurrentUsername();
         return ResponseVO.success(courseResourceService.upload(offeringId, file, resourceType, username));
     }
 
+    @Operation(summary = "删除指定的课程资源")
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('course:upload-resource')")
+    public ResponseVO<Void> delete(@PathVariable Long id) {
+        String username = getCurrentUsername();
+        courseResourceService.delete(id, username);
+        return ResponseVO.success();
+    }
+
+    // ==================== 通用接口（已登录用户 + 选课校验） ====================
+
+    @Operation(summary = "查询某门开课的所有资源",
+            description = "仅限选修该课程的学生或授课教师可查看")
+    @GetMapping("/offering/{offeringId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseVO<List<CourseResourceResponse>> listByOffering(@PathVariable Long offeringId) {
+        String username = getCurrentUsername();
+        return ResponseVO.success(courseResourceService.listByOfferingId(offeringId, username));
+    }
+
     @Operation(summary = "下载课程资源文件",
-            description = "根据资源 ID 下载对应的文件，任何已登录用户均可访问")
+            description = "根据资源 ID 下载对应的文件，仅限选修该课程的学生或授课教师可下载")
     @GetMapping("/download/{id}")
     @PreAuthorize("isAuthenticated()")
     public void download(@PathVariable Long id, HttpServletResponse response) throws IOException {
-        CourseResource resource = courseResourceService.getById(id);
+        String username = getCurrentUsername();
+
+        // 获取资源信息并校验访问权限（包含选课校验）
+        CourseResource resource = courseResourceService.getByIdWithAccessCheck(id, username);
+
         Path filePath = Paths.get("uploads/course", resource.getFilePath());
 
         if (!Files.exists(filePath)) {
@@ -87,21 +118,6 @@ public class CourseResourceController {
             Files.copy(filePath, out);
             out.flush();
         }
-    }
-
-    @Operation(summary = "查询某门开课的所有资源")
-    @GetMapping("/offering/{offeringId}")
-    public ResponseVO<List<CourseResourceResponse>> listByOffering(@PathVariable Long offeringId) {
-        String username = getCurrentUsername();
-        return ResponseVO.success(courseResourceService.listByOfferingId(offeringId, username));
-    }
-
-    @Operation(summary = "删除指定的课程资源")
-    @DeleteMapping("/{id}")
-    public ResponseVO<Void> delete(@PathVariable Long id) {
-        String username = getCurrentUsername();
-        courseResourceService.delete(id, username);
-        return ResponseVO.success();
     }
 
     private String getCurrentUsername() {

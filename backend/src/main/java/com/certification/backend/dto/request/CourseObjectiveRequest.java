@@ -15,6 +15,8 @@ public class CourseObjectiveRequest {
 
     private Long id;
 
+    private String code;
+
     @NotBlank(message = "目标描述不能为空")
     private String description;
 
