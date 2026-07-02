@@ -4,7 +4,7 @@
     <el-aside :width="isCollapse ? '64px' : '220px'">
       <div class="sidebar-header">
         <el-icon><School /></el-icon>
-        <span v-if="!isCollapse">工程系统</span>
+        <span v-if="!isCollapse">工程教育系统</span>
       </div>
 
       <!-- 使用 menuKey 作为 key，每次权限变化时重新渲染整个菜单 -->
