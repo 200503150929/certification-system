@@ -356,6 +356,10 @@ public class CourseOfferingServiceImpl implements CourseOfferingService {
             resp.setCredits(c.getCredits());
             resp.setCourseType(c.getCourseType());
             resp.setIsRequired(c.getIsRequired());
+            // ========== 新增：设置 programId ==========
+            resp.setProgramId(c.getProgramId());
+            // 如果 Course 实体有 programName 字段，也可以设置
+            // resp.setProgramName(c.getProgramName());
         });
 
         userRepository.findById(offering.getTeacherId()).ifPresent(u ->

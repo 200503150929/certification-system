@@ -379,7 +379,6 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Plus, Upload, UploadFilled, Check } from '@element-plus/icons-vue'
 import request from '@/api/request'
-// ========== 新增：引入学生名单管理组件 ==========
 import StudentImport from '@/views/teacher/components/StudentImport.vue'
 
 const route = useRoute()
@@ -397,7 +396,9 @@ const courseInfo = ref({
   credits: '',
   teacherName: '',
   academicYear: '',
-  semester: ''
+  semester: '',
+  programId: null,  // 添加 programId 字段
+  courseId: null    // 添加 courseId 字段
 })
 
 // ============ 学生名单 ============
@@ -493,24 +494,98 @@ const getSelectClass = (val) => {
 
 const onMatrixChange = () => { matrixUnsaved.value = true }
 
+// ============ 【核心修复】获取指标点数据 ============
+const fetchIndicatorsByProgram = async (programId) => {
+  try {
+    // 1. 获取该专业下的所有毕业要求
+    const reqRes = await request.get(`/admin/program/requirements/list/${programId}`)
+    const requirements = reqRes.data || []
+
+    if (requirements.length === 0) {
+      console.warn('该专业暂无毕业要求')
+      return []
+    }
+
+    // 2. 获取所有指标点
+    const allIndicators = []
+    for (const req of requirements) {
+      const indRes = await request.get(`/admin/program/indicators/list/${req.id}`)
+      const inds = (indRes.data || []).map(ind => ({
+        indicatorId: ind.id,
+        indicatorCode: ind.code,
+        indicatorDesc: ind.description,
+        requirementCode: req.code,
+        requirementId: req.id
+      }))
+      allIndicators.push(...inds)
+    }
+
+    console.log('获取到的指标点数量:', allIndicators.length)
+    return allIndicators
+  } catch (error) {
+    console.error('获取指标点失败:', error)
+    return []
+  }
+}
+
+// ============ 【核心修复】加载矩阵数据 ============
 const fetchMatrixData = async () => {
-  if (objectives.value.length === 0) { matrixRows.value = []; return }
+  if (objectives.value.length === 0) {
+    matrixRows.value = []
+    matrixIndicators.value = []
+    return
+  }
+
+  // 通过 courseInfo 获取 programId
+  const programId = courseInfo.value?.programId
+  console.log('当前课程的 programId:', programId)
+
+  if (!programId) {
+    console.warn('课程未关联培养方案，跳过加载指标点')
+    matrixIndicators.value = []
+    matrixRows.value = []
+    return
+  }
+
   matrixLoading.value = true
   try {
-    const indRes = await request.get(`/teacher/objectives/indicators/${offeringId.value}`)
-    matrixIndicators.value = indRes.data || []
+    // 【核心修复】使用与管理员端相同的方式获取指标点
+    const indicators = await fetchIndicatorsByProgram(programId)
 
-    const matRes = await request.get(`/teacher/objectives/matrix/${offeringId.value}`)
-    const items = matRes.data || []
+    if (indicators.length === 0) {
+      matrixIndicators.value = []
+      matrixRows.value = []
+      ElMessage.info('该专业暂无毕业要求指标点数据，请先联系管理员在培养方案中配置指标点')
+      return
+    }
 
+    matrixIndicators.value = indicators
+
+    // 获取已保存的矩阵数据
+    let savedItems = []
+    try {
+      const matRes = await request.get(`/teacher/objectives/matrix/${offeringId.value}`)
+      if (matRes.status === 'success' && matRes.data) {
+        savedItems = Array.isArray(matRes.data) ? matRes.data : []
+      }
+    } catch (e) {
+      console.warn('获取已保存矩阵数据失败:', e)
+      savedItems = []
+    }
+
+    // 构建矩阵数据
     const itemMap = {}
-    for (const it of items) {
+    for (const it of savedItems) {
       if (!itemMap[it.objectiveId]) itemMap[it.objectiveId] = {}
       itemMap[it.objectiveId][it.indicatorId] = it.supportLevel
     }
 
     matrixRows.value = objectives.value.map(obj => {
-      const row = { objectiveId: obj.id, code: obj.code, supportMap: {} }
+      const row = {
+        objectiveId: obj.id,
+        code: obj.code,
+        supportMap: {}
+      }
       for (const ind of matrixIndicators.value) {
         const existing = (itemMap[obj.id] && itemMap[obj.id][ind.indicatorId]) || ''
         row.supportMap[ind.indicatorId] = existing
@@ -518,7 +593,11 @@ const fetchMatrixData = async () => {
       return row
     })
     matrixUnsaved.value = false
+
+    console.log('矩阵数据加载完成，行数:', matrixRows.value.length)
+
   } catch (e) {
+    console.error('加载矩阵数据异常:', e)
     matrixIndicators.value = []
     matrixRows.value = []
   } finally {
@@ -526,7 +605,13 @@ const fetchMatrixData = async () => {
   }
 }
 
+// ============ 保存矩阵 ============
 const saveMatrix = async () => {
+  if (matrixRows.value.length === 0) {
+    ElMessage.warning('没有可保存的矩阵数据')
+    return
+  }
+
   matrixSaving.value = true
   try {
     const items = []
@@ -534,10 +619,15 @@ const saveMatrix = async () => {
       for (const ind of matrixIndicators.value) {
         const val = row.supportMap[ind.indicatorId]
         if (val && ['H', 'M', 'L'].includes(val)) {
-          items.push({ objectiveId: row.objectiveId, indicatorId: ind.indicatorId, supportLevel: val })
+          items.push({
+            objectiveId: row.objectiveId,
+            indicatorId: ind.indicatorId,
+            supportLevel: val
+          })
         }
       }
     }
+
     await request.post(`/teacher/objectives/matrix/${offeringId.value}`, items)
     ElMessage.success('矩阵保存成功')
     matrixUnsaved.value = false
@@ -650,9 +740,14 @@ const fetchCourseInfo = async () => {
     const res = await request.get(`/teacher/offering/detail/${offeringId.value}`)
     if (res.status === 'success' && res.data) {
       courseInfo.value = res.data
+      console.log('课程信息加载完成:', {
+        programId: res.data.programId,
+        courseId: res.data.courseId,
+        offeringId: offeringId.value
+      })
     }
   } catch (e) {
-    // 拦截器已处理
+    console.error('加载课程信息失败:', e)
   } finally {
     pageLoading.value = false
   }
@@ -662,10 +757,14 @@ const fetchCourseInfo = async () => {
 const fetchStudents = async () => {
   studentsLoading.value = true
   try {
-    // 使用新接口获取学生名单
     const res = await request.get(`/teacher/student-course/list/${offeringId.value}`)
     if (res.status === 'success' && res.data) {
-      rawStudents.value = res.data
+      if (Array.isArray(res.data)) {
+        rawStudents.value = res.data
+      } else {
+        const list = res.data.list || res.data.records || []
+        rawStudents.value = Array.isArray(list) ? list : []
+      }
     }
   } catch (e) {
     rawStudents.value = []
@@ -846,10 +945,6 @@ const exportStudentGrades = () => {
       .catch(() => ElMessage.error('导出失败'))
 }
 
-const exportStudentList = () => {
-  exportStudentGrades()
-}
-
 // ============ 考核环节（仅用于计数） ============
 const fetchAssessments = async () => {
   try {
@@ -869,9 +964,11 @@ const fetchObjectives = async () => {
     const res = await request.get(`/teacher/offering/${offeringId.value}/objectives`)
     if (res.status === 'success' && res.data) {
       objectives.value = res.data
-      fetchMatrixData()
+      // 加载矩阵数据
+      await fetchMatrixData()
     }
   } catch (e) {
+    console.error('获取课程目标失败:', e)
     objectives.value = []
   } finally {
     objectivesLoading.value = false
@@ -979,12 +1076,10 @@ const studentImportRef = ref(null)
 
 // ============ 学生名单刷新回调 ============
 const handleStudentRefresh = () => {
-  // 刷新统计数据（学生人数会通过 rawStudents 自动更新）
   fetchStudents()
 }
 
 const handleStudentCountChange = (count) => {
-  // 可选：处理学生人数变化
   console.log('学生人数已更新:', count)
 }
 
@@ -992,7 +1087,6 @@ const handleStudentCountChange = (count) => {
 const handleTabChange = (tab) => {
   switch (tab) {
     case 'students':
-      // 调用子组件刷新
       if (studentImportRef.value) {
         studentImportRef.value.loadStudents()
       } else {
@@ -1003,22 +1097,39 @@ const handleTabChange = (tab) => {
       fetchWeights().then(() => {
         fetchStudentGrades().then(() => recalcColumnWidth())
       })
-      fetchAssessments()
+      if (assessments.value.length === 0) {
+        fetchAssessments()
+      }
       break
     case 'objectives':
-      fetchObjectives()
+      if (objectives.value.length === 0) {
+        fetchObjectives()
+      }
       break
     case 'resources':
-      fetchResources()
+      if (resources.value.length === 0) {
+        fetchResources()
+      }
       break
   }
 }
 
 // ============ 初始化 ============
-onMounted(() => {
-  fetchCourseInfo()
-  fetchObjectives()
+onMounted(async () => {
+  // 1. 先加载课程基本信息
+  await fetchCourseInfo()
+  console.log('courseInfo 加载完成:', courseInfo.value)
 
+  // 2. 再加载课程目标（内部会调用 fetchMatrixData）
+  await fetchObjectives()
+  console.log('objectives 加载完成:', objectives.value.length)
+
+  // 3. 加载其他统计数据
+  fetchStudents()
+  fetchResources()
+  fetchAssessments()
+
+  // 成绩表格列宽自适应
   resizeObserver = new ResizeObserver(() => recalcColumnWidth())
   const wrap = gradeTableWrapRef.value
   if (wrap) resizeObserver.observe(wrap)

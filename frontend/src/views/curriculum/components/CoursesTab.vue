@@ -2,7 +2,13 @@
   <div class="courses-tab">
     <div class="toolbar">
       <div class="toolbar-left">
-        <el-button type="primary" :icon="Plus" @click="openAddDialog" :disabled="disabled">
+        <el-button
+            v-if="hasPermission('course:add')"
+            type="primary"
+            :icon="Plus"
+            @click="openAddDialog"
+            :disabled="disabled"
+        >
           添加课程
         </el-button>
       </div>
@@ -61,16 +67,42 @@
           {{ scope.row.semester || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="300" fixed="right">
+      <!-- 👇 整个操作列用 v-if 控制，只有有任一操作权限时才显示 -->
+      <el-table-column
+          label="操作"
+          width="300"
+          fixed="right"
+          v-if="hasPermission('course:update') || hasPermission('course:delete') || hasPermission('course:offering-manage')"
+      >
         <template #default="scope">
-          <el-button link type="primary" :icon="Edit" @click="openEditDialog(scope.row)" :disabled="disabled">
+          <!-- 编辑课程 -->
+          <el-button
+              v-if="hasPermission('course:update')"
+              link type="primary"
+              :icon="Edit"
+              @click="openEditDialog(scope.row)"
+              :disabled="disabled"
+          >
             编辑
           </el-button>
-          <el-button link type="danger" :icon="Delete" @click="handleDelete(scope.row)" :disabled="disabled">
+
+          <!-- 删除课程 -->
+          <el-button
+              v-if="hasPermission('course:delete')"
+              link type="danger"
+              :icon="Delete"
+              @click="handleDelete(scope.row)"
+              :disabled="disabled"
+          >
             删除
           </el-button>
-          <!-- 新增：开课管理按钮 -->
-          <el-button link type="primary" @click="openOfferingManagement(scope.row)">
+
+          <!-- 开课管理 -->
+          <el-button
+              v-if="hasPermission('course:offering-manage')"
+              link type="primary"
+              @click="openOfferingManagement(scope.row)"
+          >
             开课管理
           </el-button>
         </template>
@@ -153,6 +185,7 @@
 import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete, Download } from '@element-plus/icons-vue'
+import { useAuthStore } from '@/stores/auth'
 import request from '@/api/request'
 import OfferingManagement from './OfferingManagement.vue'
 
@@ -168,6 +201,13 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['change'])
+
+// ============ 权限检查 ============
+const authStore = useAuthStore()
+
+const hasPermission = (permission) => {
+  return authStore.hasPermission(permission)
+}
 
 // ============ 状态 ============
 const loading = ref(false)
@@ -374,7 +414,6 @@ const openOfferingManagement = (row) => {
 }
 
 const handleOfferingSuccess = () => {
-  // 开课记录变更后刷新课程列表（显示最新的开课状态）
   fetchCourses()
 }
 

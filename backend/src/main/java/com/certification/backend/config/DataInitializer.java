@@ -14,15 +14,15 @@ import java.math.RoundingMode;
 import java.util.*;
 
 /**
- * 项目启动时初始化全面测试数据（答辩演示用）
+ * 项目启动时初始化全面测试数据
  *
  * ====== 用户账号 ======
  * 管理员: admin / 123456
- * 教师:   teacher01 / 123456 (张教授-计算机学院)
- *         teacher02 / 123456 (李教授-计算机学院)
- *         teacher03 / 123456 (王教授-软件学院)
- *         teacher04 / 123456 (赵教授-软件学院)
- * 学生:   student01~15 / 123456
+ * 教师:   T000001 / 123456 (张伟-计算机学院)
+ *         T000002 / 123456 (李明-计算机学院)
+ *         T000003 / 123456 (王芳-软件学院)
+ *         T000004 / 123456 (刘洋-软件学院)
+ * 学生:   20240001~20240015 / 123456
  *
  * ====== 培养方案 (2个专业) ======
  * 计算机科学与技术 2024版 (已发布)
@@ -119,7 +119,7 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         log.info("===========================================================");
-        log.info("      开始初始化答辩演示用全面测试数据");
+        log.info("      开始初始化全面测试数据");
         log.info("===========================================================");
 
         // ============ 第1步：角色 ============
@@ -232,10 +232,10 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         log.info("===========================================================");
-        log.info("      答辩演示测试数据初始化完成！");
+        log.info("      测试数据初始化完成！");
         log.info("      管理员: admin/123456");
-        log.info("      教师: teacher01~04/123456");
-        log.info("      学生: student01~15/123456");
+        log.info("      教师: T000001~T000004/123456");
+        log.info("      学生: 20240001~20240015/123456");
         log.info("===========================================================");
     }
 
@@ -344,10 +344,10 @@ public class DataInitializer implements CommandLineRunner {
     private List<User> initTeachers() {
         List<User> teachers = new ArrayList<>();
         String[][] data = {
-                {"teacher01", "张教授", "13800000001", "zhang@university.edu", "计算机学院", "计算机科学与技术"},
-                {"teacher02", "李教授", "13800000002", "li@university.edu",   "计算机学院", "计算机科学与技术"},
-                {"teacher03", "王教授", "13800000003", "wang@university.edu", "软件学院",   "软件工程"},
-                {"teacher04", "赵教授", "13800000004", "zhao@university.edu", "软件学院",   "软件工程"},
+                {"T000001", "张伟", "13800000001", "zhangwei@university.edu", "计算机学院", "计算机科学与技术"},
+                {"T000002", "李明", "13800000002", "liming@university.edu", "计算机学院", "计算机科学与技术"},
+                {"T000003", "王芳", "13800000003", "wangfang@university.edu", "软件学院", "软件工程"},
+                {"T000004", "刘洋", "13800000004", "liuyang@university.edu", "软件学院", "软件工程"},
         };
         for (String[] d : data) {
             User t = userRepo.findByUsername(d[0]).orElseGet(() -> {
@@ -365,25 +365,40 @@ public class DataInitializer implements CommandLineRunner {
             });
             teachers.add(t);
         }
-        log.info("  ✓ 教师: teacher01~04 / 123456");
+        log.info("  ✓ 教师: T000001~T000004 / 123456");
         return teachers;
     }
 
     // ==================== 4. 学生 (15人) ====================
     private List<User> initStudents(int from, int to, String major) {
         List<User> students = new ArrayList<>();
-        String[] names = {
-                "赵一", "钱二", "孙三", "李四", "周五",
-                "吴六", "郑七", "王八", "冯九", "陈十",
-                "褚十一", "卫十二", "蒋十三", "沈十四", "韩十五"
+        String[][] studentData = {
+                // 计算机学院 - 计算机科学与技术 (10人)
+                {"20240001", "陈思远", "计算机学院", "计算机科学与技术"},
+                {"20240002", "林雨桐", "计算机学院", "计算机科学与技术"},
+                {"20240003", "黄子轩", "计算机学院", "计算机科学与技术"},
+                {"20240004", "周若曦", "计算机学院", "计算机科学与技术"},
+                {"20240005", "吴宇航", "计算机学院", "计算机科学与技术"},
+                {"20240006", "郑欣怡", "计算机学院", "计算机科学与技术"},
+                {"20240007", "孙浩然", "计算机学院", "计算机科学与技术"},
+                {"20240008", "沈梦瑶", "计算机学院", "计算机科学与技术"},
+                {"20240009", "陆子昂", "计算机学院", "计算机科学与技术"},
+                {"20240010", "许佳琪", "计算机学院", "计算机科学与技术"},
+                // 软件学院 - 软件工程 (5人)
+                {"20240011", "何沐阳", "软件学院", "软件工程"},
+                {"20240012", "宋雨薇", "软件学院", "软件工程"},
+                {"20240013", "唐逸飞", "软件学院", "软件工程"},
+                {"20240014", "曹梦涵", "软件学院", "软件工程"},
+                {"20240015", "邓子骞", "软件学院", "软件工程"},
         };
-        String college = major.contains("软件") ? "软件学院" : "计算机学院";
+
         String grade = "2024级";
-        for (int i = from; i <= to; i++) {
-            final int idx = i; // effectively final for lambda
-            String username = String.format("student%02d", i);
-            String name = (idx - 1) < names.length ? names[idx - 1] : "学生" + idx;
-            String className = (idx % 3 + 1) + "班";
+        for (String[] d : studentData) {
+            String username = d[0];
+            String name = d[1];
+            String college = d[2];
+            String majorName = d[3];
+            String className = (Integer.parseInt(username.substring(6)) % 3 + 1) + "班";
 
             User s = userRepo.findByUsername(username).orElseGet(() -> {
                 User u = new User();
@@ -392,7 +407,7 @@ public class DataInitializer implements CommandLineRunner {
                 u.setName(name);
                 u.setRole("student");
                 u.setCollege(college);
-                u.setMajor(major);
+                u.setMajor(majorName);
                 u.setGrade(grade);
                 u.setClassName(className);
                 u.setStatus(1);
@@ -400,7 +415,7 @@ public class DataInitializer implements CommandLineRunner {
             });
             students.add(s);
         }
-        log.info("  ✓ {} 学生: student{:02d}~{:02d} / 123456 ({})", students.size(), from, to, major);
+        log.info("  ✓ 学生 15人: 20240001~20240015 / 123456");
         return students;
     }
 
@@ -494,52 +509,52 @@ public class DataInitializer implements CommandLineRunner {
         String[][][] ipData = {
                 // GR1 工程知识
                 {{"1.1", "掌握数学和自然科学基础知识，具备运用数学方法进行抽象建模和逻辑推理的能力", "0.030"},
-                 {"1.2", "掌握计算机科学与技术核心专业知识，包括程序设计、数据结构、算法分析与设计等", "0.030"},
-                 {"1.3", "能够将工程基础知识应用于计算机系统分析与设计，解决实际工程问题", "0.030"}},
+                        {"1.2", "掌握计算机科学与技术核心专业知识，包括程序设计、数据结构、算法分析与设计等", "0.030"},
+                        {"1.3", "能够将工程基础知识应用于计算机系统分析与设计，解决实际工程问题", "0.030"}},
                 // GR2 问题分析
                 {{"2.1", "能够运用计算机科学基本原理，识别和表述复杂工程问题的关键要素和约束条件", "0.028"},
-                 {"2.2", "能够通过文献检索、资料查询等方法，分析复杂工程问题的国内外研究现状和发展趋势", "0.028"},
-                 {"2.3", "能够综合运用所学知识，对复杂工程问题进行分析、建模，并获得有效结论", "0.028"}},
+                        {"2.2", "能够通过文献检索、资料查询等方法，分析复杂工程问题的国内外研究现状和发展趋势", "0.028"},
+                        {"2.3", "能够综合运用所学知识，对复杂工程问题进行分析、建模，并获得有效结论", "0.028"}},
                 // GR3 设计/开发
                 {{"3.1", "能够根据用户需求，设计满足特定功能和非功能需求的软件系统方案", "0.028"},
-                 {"3.2", "能够在系统设计中综合考虑社会、健康、安全、法律、文化及环境等非技术因素", "0.028"},
-                 {"3.3", "能够在设计过程中体现创新意识，提出改进或替代方案", "0.028"}},
+                        {"3.2", "能够在系统设计中综合考虑社会、健康、安全、法律、文化及环境等非技术因素", "0.028"},
+                        {"3.3", "能够在设计过程中体现创新意识，提出改进或替代方案", "0.028"}},
                 // GR4 研究
                 {{"4.1", "能够基于计算机科学原理，针对特定工程问题设计合理的实验方案", "0.025"},
-                 {"4.2", "能够运用现代工具和方法进行数据采集、处理和分析，正确解释实验数据", "0.025"},
-                 {"4.3", "能够综合实验数据和分析结果，得出合理有效的结论并撰写研究报告", "0.025"}},
+                        {"4.2", "能够运用现代工具和方法进行数据采集、处理和分析，正确解释实验数据", "0.025"},
+                        {"4.3", "能够综合实验数据和分析结果，得出合理有效的结论并撰写研究报告", "0.025"}},
                 // GR5 使用现代工具
                 {{"5.1", "了解计算机领域常用的开发工具、平台和框架，理解其原理和适用场景", "0.025"},
-                 {"5.2", "能够针对具体工程问题，选择并熟练使用合适的开发工具和平台", "0.025"},
-                 {"5.3", "能够利用现代工具进行复杂工程问题的建模、仿真和预测，并理解工具的局限性", "0.025"}},
+                        {"5.2", "能够针对具体工程问题，选择并熟练使用合适的开发工具和平台", "0.025"},
+                        {"5.3", "能够利用现代工具进行复杂工程问题的建模、仿真和预测，并理解工具的局限性", "0.025"}},
                 // GR6 工程与社会
                 {{"6.1", "了解计算机技术与应用相关的社会、健康、安全、法律及文化等方面的基本知识", "0.025"},
-                 {"6.2", "能够分析和评价计算机工程实践对社会的影响，理解工程技术的社会价值", "0.025"},
-                 {"6.3", "理解软件工程师在信息安全、隐私保护等方面的社会责任和职业操守", "0.025"}},
+                        {"6.2", "能够分析和评价计算机工程实践对社会的影响，理解工程技术的社会价值", "0.025"},
+                        {"6.3", "理解软件工程师在信息安全、隐私保护等方面的社会责任和职业操守", "0.025"}},
                 // GR7 环境与可持续发展
                 {{"7.1", "了解环境保护和可持续发展的基本理念和相关法律法规", "0.022"},
-                 {"7.2", "能够理解和评价计算机工程实践对环境和可持续发展的影响", "0.022"},
-                 {"7.3", "了解绿色计算、节能减排等信息技术领域的可持续发展实践", "0.022"}},
+                        {"7.2", "能够理解和评价计算机工程实践对环境和可持续发展的影响", "0.022"},
+                        {"7.3", "了解绿色计算、节能减排等信息技术领域的可持续发展实践", "0.022"}},
                 // GR8 职业规范
                 {{"8.1", "具有良好的人文社会科学素养和正确的价值观，理解个人与社会的关系", "0.028"},
-                 {"8.2", "理解计算机工程师的职业性质和责任，能够在工程实践中遵守职业道德规范", "0.028"},
-                 {"8.3", "了解软件工程领域的知识产权、专利等法律知识，尊重他人劳动成果", "0.028"}},
+                        {"8.2", "理解计算机工程师的职业性质和责任，能够在工程实践中遵守职业道德规范", "0.028"},
+                        {"8.3", "了解软件工程领域的知识产权、专利等法律知识，尊重他人劳动成果", "0.028"}},
                 // GR9 个人和团队
                 {{"9.1", "能够在多学科团队中承担个体角色，完成分配的任务并按时交付", "0.028"},
-                 {"9.2", "具备良好的团队协作能力，能够与其他成员有效沟通和协作", "0.028"},
-                 {"9.3", "具备一定的组织协调能力，能够在适当情况下担任团队负责人的角色", "0.028"}},
+                        {"9.2", "具备良好的团队协作能力，能够与其他成员有效沟通和协作", "0.028"},
+                        {"9.3", "具备一定的组织协调能力，能够在适当情况下担任团队负责人的角色", "0.028"}},
                 // GR10 沟通
                 {{"10.1", "能够撰写规范的技术文档、实验报告和项目总结，表达清晰、逻辑严谨", "0.028"},
-                 {"10.2", "能够进行有效的口头陈述和演示，清晰表达技术方案和设计思路", "0.028"},
-                 {"10.3", "具备一定的英语应用能力，能够阅读英文技术文献并进行基本的国际交流", "0.028"}},
+                        {"10.2", "能够进行有效的口头陈述和演示，清晰表达技术方案和设计思路", "0.028"},
+                        {"10.3", "具备一定的英语应用能力，能够阅读英文技术文献并进行基本的国际交流", "0.028"}},
                 // GR11 项目管理
                 {{"11.1", "理解软件项目管理的基本原理和方法，包括项目计划、进度控制和质量管理", "0.022"},
-                 {"11.2", "掌握基本的工程经济决策方法，能够进行成本效益分析", "0.022"},
-                 {"11.3", "能够在多学科环境中应用项目管理知识，有效组织和管理工程项目", "0.022"}},
+                        {"11.2", "掌握基本的工程经济决策方法，能够进行成本效益分析", "0.022"},
+                        {"11.3", "能够在多学科环境中应用项目管理知识，有效组织和管理工程项目", "0.022"}},
                 // GR12 终身学习
                 {{"12.1", "具有自主学习的意识，能够认识到持续学习对于职业发展的重要性", "0.028"},
-                 {"12.2", "具备信息获取能力，能够利用多种渠道跟踪计算机领域的最新技术发展", "0.028"},
-                 {"12.3", "具有良好的学习习惯和方法，能够不断适应技术变革和职业发展需求", "0.028"}},
+                        {"12.2", "具备信息获取能力，能够利用多种渠道跟踪计算机领域的最新技术发展", "0.028"},
+                        {"12.3", "具有良好的学习习惯和方法，能够不断适应技术变革和职业发展需求", "0.028"}},
         };
 
         List<IndicatorPoint> all = new ArrayList<>();
@@ -560,7 +575,7 @@ public class DataInitializer implements CommandLineRunner {
 
     // ==================== 9. 目标-要求支撑矩阵 ====================
     private void initObjectiveRequirementMatrix(List<EducationalObjective> objectives,
-                                                 List<GraduationRequirement> requirements) {
+                                                List<GraduationRequirement> requirements) {
         // 检查这些 objectives 是否已有矩阵数据
         List<Long> objIds = new ArrayList<>();
         for (EducationalObjective obj : objectives) objIds.add(obj.getId());
@@ -626,8 +641,8 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Course createCourse(String code, String name, String credits, String totalHours,
-                                 String theoryHours, String labHours, String semester,
-                                 String courseType, String isRequired, Long programId) {
+                                String theoryHours, String labHours, String semester,
+                                String courseType, String isRequired, Long programId) {
         return courseRepo.findByCode(code).orElseGet(() -> {
             Course c = new Course();
             c.setCode(code);
@@ -703,7 +718,7 @@ public class DataInitializer implements CommandLineRunner {
 
     // ==================== 12. 开课记录 ====================
     private CourseOffering initOffering(Course course, User teacher,
-                                         String academicYear, String semester) {
+                                        String academicYear, String semester) {
         boolean exists = offeringRepo.existsByCourseIdAndTeacherIdAndAcademicYearAndSemester(
                 course.getId(), teacher.getId(), academicYear, semester);
         if (exists) {
@@ -863,7 +878,9 @@ public class DataInitializer implements CommandLineRunner {
         int total = 0;
         for (User student : students) {
             // 根据学生序号生成不同水平的成绩
-            int idx = Integer.parseInt(student.getUsername().replace("student", ""));
+            String username = student.getUsername();
+            int idx = Integer.parseInt(username.substring(6)); // 从学号20240001中提取01~15
+
             int base;
             int spread;
             if (idx <= 3 || idx == 11) {           // 优秀学生 (85-98)
@@ -904,8 +921,8 @@ public class DataInitializer implements CommandLineRunner {
 
     // ==================== 18. 课程目标-指标点支撑矩阵 ====================
     private void initObjectiveIndicatorMatrix(List<CourseObjective> objectives,
-                                               List<IndicatorPoint> indicators,
-                                               Long courseId) {
+                                              List<IndicatorPoint> indicators,
+                                              Long courseId) {
         // 检查该课程的 objectives 是否已有矩阵数据
         List<Long> objIds = new ArrayList<>();
         for (CourseObjective obj : objectives) objIds.add(obj.getId());
