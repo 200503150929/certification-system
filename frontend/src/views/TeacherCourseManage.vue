@@ -494,28 +494,20 @@ const getSelectClass = (val) => {
 
 const onMatrixChange = () => { matrixUnsaved.value = true }
 
-// ============ 【核心修复】获取指标点数据 ============
 const fetchIndicatorsByProgram = async (programId) => {
   try {
-    // 1. 获取该专业下的所有毕业要求
-    const reqRes = await request.get(`/admin/program/requirements/list/${programId}`)
-    const requirements = reqRes.data || []
+    const res = await request.get(`/admin/program/requirements/detail-list/${programId}`)
+    const details = res.data || []
 
-    if (requirements.length === 0) {
-      console.warn('该专业暂无毕业要求')
-      return []
-    }
-
-    // 2. 获取所有指标点
     const allIndicators = []
-    for (const req of requirements) {
-      const indRes = await request.get(`/admin/program/indicators/list/${req.id}`)
-      const inds = (indRes.data || []).map(ind => ({
+    for (const detail of details) {
+      // 注意字段名是 indicatorPoints
+      const inds = (detail.indicatorPoints || []).map(ind => ({
         indicatorId: ind.id,
         indicatorCode: ind.code,
         indicatorDesc: ind.description,
-        requirementCode: req.code,
-        requirementId: req.id
+        requirementCode: detail.code,
+        requirementId: detail.id
       }))
       allIndicators.push(...inds)
     }
@@ -964,14 +956,13 @@ const fetchObjectives = async () => {
     const res = await request.get(`/teacher/offering/${offeringId.value}/objectives`)
     if (res.status === 'success' && res.data) {
       objectives.value = res.data
-      // 加载矩阵数据
-      await fetchMatrixData()
+      fetchMatrixData()
     }
   } catch (e) {
     console.error('获取课程目标失败:', e)
     objectives.value = []
   } finally {
-    objectivesLoading.value = false
+    objectivesLoading.value = false  // ← 课程目标表格先显示
   }
 }
 
@@ -1116,29 +1107,27 @@ const handleTabChange = (tab) => {
 
 // ============ 初始化 ============
 onMounted(async () => {
-  // 1. 先加载课程基本信息
+  // 1. 先加载课程基本信息（必须，因为其他接口需要 programId）
   await fetchCourseInfo()
   console.log('courseInfo 加载完成:', courseInfo.value)
 
-  // 2. 再加载课程目标（内部会调用 fetchMatrixData）
-  await fetchObjectives()
-  console.log('objectives 加载完成:', objectives.value.length)
+  // 2. 并行加载所有数据，互不阻塞
+  await Promise.all([
+    fetchObjectives(),   // 课程目标 + 矩阵数据
+    fetchStudents(),     // 学生人数（与矩阵同时加载）
+    fetchResources(),    // 教学资源
+    fetchAssessments()   // 考核环节
+  ])
 
-  // 3. 加载其他统计数据
-  fetchStudents()
-  fetchResources()
-  fetchAssessments()
+  console.log('所有数据加载完成')
+  console.log('objectives 数量:', objectives.value.length)
+  console.log('学生人数:', rawStudents.value.length)
 
-  // 成绩表格列宽自适应
+  // 3. 成绩表格列宽自适应
   resizeObserver = new ResizeObserver(() => recalcColumnWidth())
   const wrap = gradeTableWrapRef.value
   if (wrap) resizeObserver.observe(wrap)
   window.addEventListener('resize', recalcColumnWidth)
-})
-
-onUnmounted(() => {
-  if (resizeObserver) resizeObserver.disconnect()
-  window.removeEventListener('resize', recalcColumnWidth)
 })
 </script>
 

@@ -6,7 +6,7 @@ import Layout from '../views/layout/Layout.vue'
 import Dashboard from '../views/Dashboard.vue'
 import UserManagement from '../views/UserManagement.vue'
 import RoleManagement from '../views/RoleManagement.vue'
-import CourseManagement from '../views/CourseManagement.vue'
+
 
 // ============ 模块七：个人信息与课程查看 ============
 import Profile from '../views/Profile.vue'
@@ -105,16 +105,16 @@ const router = createRouter({
             permissions: ['course:list']
           }
         },
-        {
-          path: 'courses/program/:programId',
-          name: 'CourseManagement',
-          component: CourseManagement,
-          meta: {
-            title: '课程体系管理',
-            icon: 'Document',
-            permissions: ['course:manage']
-          }
-        },
+        // {
+        //   path: 'courses/program/:programId',
+        //   name: 'CourseManagement',
+        //   component: CourseManagement,
+        //   meta: {
+        //     title: '课程体系管理',
+        //     icon: 'Document',
+        //     permissions: ['course:manage']
+        //   }
+        // },
         {
           path: 'course/:id',
           name: 'CourseDetail',

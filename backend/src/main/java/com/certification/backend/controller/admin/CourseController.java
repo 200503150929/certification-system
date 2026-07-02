@@ -87,7 +87,7 @@ public class CourseController {
         return ResponseVO.success(courseService.batchSaveMatrix(request));
     }
 
-    @Operation(summary = "导出课程体系及矩阵", description = "导出课程基本信息及支撑矩阵（Excel格式）")
+    @Operation(summary = "导出课程体系", description = "导出课程基本信息")
     @PreAuthorize("hasAuthority('course:manage')")
     @GetMapping("/export")
     public void export(

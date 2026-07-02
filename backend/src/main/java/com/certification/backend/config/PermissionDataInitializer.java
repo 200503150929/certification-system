@@ -78,12 +78,11 @@ public class PermissionDataInitializer implements CommandLineRunner {
                 createPermission("program:publish", "发布培养方案", "program", 46),
 
                 // ---- 课程体系管理 ----
-                createPermission("course:manage", "管理课程体系", "course", 50),
-                createPermission("course:add", "添加课程", "course", 51),
-                createPermission("course:update", "编辑课程", "course", 52),
-                createPermission("course:delete", "删除课程", "course", 53),
-                createPermission("course:support-matrix", "管理支撑矩阵", "course", 54),
-                createPermission("course:offering-manage", "开课管理", "course", 55),
+                createPermission("course:add", "添加课程", "course", 50),
+                createPermission("course:update", "编辑课程", "course", 51),
+                createPermission("course:delete", "删除课程", "course", 52),
+                createPermission("course:support-matrix", "管理支撑矩阵", "course", 53),
+                createPermission("course:offering-manage", "开课管理", "course", 54),
 
                 // ---- 课程教学管理（教师） ----
                 createPermission("course:teach", "管理授课课程", "teaching", 60),
@@ -112,7 +111,7 @@ public class PermissionDataInitializer implements CommandLineRunner {
                 "user:list", "user:add", "user:update", "user:delete", "user:reset-password", "user:import",
                 "role:list", "role:update",
                 "program:manage", "program:detail",  "program:add", "program:update", "program:delete", "program:publish",
-                "course:manage", "course:detail", "course:add", "course:update", "course:delete", "course:support-matrix",
+                "course:detail", "course:add", "course:update", "course:delete", "course:support-matrix",
                 "course:offering-manage",
                 "profile:view", "profile:edit", "profile:change-password",
                 "achievement:view", "achievement:export"
