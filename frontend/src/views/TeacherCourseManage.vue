@@ -5,7 +5,7 @@
         <div class="course-header">
           <div>
             <el-breadcrumb separator="/">
-              <el-breadcrumb-item :to="{ path: '/my-courses' }">课程管理</el-breadcrumb-item>
+              <el-breadcrumb-item>课程管理</el-breadcrumb-item>
               <el-breadcrumb-item>{{ courseInfo.courseName || '加载中...' }}</el-breadcrumb-item>
             </el-breadcrumb>
             <h2 class="course-title">{{ courseInfo.courseName }}</h2>
